@@ -1,10 +1,12 @@
-const CACHE = 'pdf-reader-v1';
+const CACHE = 'pdf-reader-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './pdf.min.js',
   './pdf.worker.min.js',
+  './favicon.png',
+  './apple-touch-icon.png',
   './icon-192.png',
   './icon-512.png'
 ];
