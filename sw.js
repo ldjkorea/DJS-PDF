@@ -1,5 +1,5 @@
-const CACHE = 'pdf-reader-v3';
-const ASSETS = [
+const CACHE_NAME = 'pdf-reader-v4';
+const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
@@ -14,41 +14,48 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE).then(cache => {
-      return Promise.allSettled(
-        ASSETS.map(url => cache.add(url).catch(err => console.warn('Cache error:', url, err)))
-      );
-    })
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(ASSETS_TO_CACHE);
+    }).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.map(k => {
+          if (k !== CACHE_NAME) return caches.delete(k);
+        })
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+  // CDN 외부 요청(Pretendard 폰트 등)은 네트워크 직접 통과
+  const url = e.request.url;
+  if (url.includes('cdn.jsdelivr.net') || url.includes('fonts.googleapis.com')) {
+    return;
+  }
+
+  // Network First 전략: 최신 코드 우선 수신 후 캐시 저장, 오프라인 시 캐시 폴백
   e.respondWith(
-    caches.match(e.request).then(hit => {
-      if (hit) return hit;
-      return fetch(e.request).then(res => {
-        if (res && res.status === 200 && res.type === 'basic') {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+    fetch(e.request)
+      .then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200 && e.request.method === 'GET') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(e.request, responseToCache);
+          });
         }
-        return res;
-      }).catch(() => {
-        if (e.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-        return new Response('', { status: 408 });
-      });
-    })
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(e.request).then(cached => {
+          return cached || caches.match('./index.html');
+        });
+      })
   );
 });
