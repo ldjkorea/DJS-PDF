@@ -297,10 +297,16 @@
     <img src="icon-192.png" alt="PDF 리더" class="brand-logo" width="84" height="84">
     <h1>PDF 리더</h1>
     <p class="sub">광고 없는 초경량 고화질 PDF 뷰어<br>오프라인 완전 저장 · 야간 독서 모드</p>
-    <button class="open-main" id="openMain">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>
-      <span>PDF 파일 열기</span>
-    </button>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button class="open-main" id="openMain">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>
+        <span>PDF 파일 열기</span>
+      </button>
+      <button class="open-main" id="installBtn" style="display:none;background:linear-gradient(180deg,#35312b,#23201b);color:var(--text);border:1px solid var(--line-strong);box-shadow:0 8px 20px rgba(0,0,0,0.4)">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>앱 설치</span>
+      </button>
+    </div>
     <div class="drop-hint">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       <span>또는 화면에 파일을 끌어다 놓으세요</span>
@@ -949,7 +955,37 @@ window.addEventListener('resize', ()=>{
   resizeT = setTimeout(()=> renderPage(pageNum, false), 180);
 });
 
-/* ── 서비스 워커 등록 ── */
+/* ── PWA 설치 프롬프트 및 서비스 워커 등록 ── */
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const btn = $('installBtn');
+  if (btn) btn.style.display = 'inline-flex';
+});
+
+if ($('installBtn')) {
+  $('installBtn').onclick = async () => {
+    if (!deferredPrompt) {
+      toast('브라우저 메뉴(⋮)에서 [앱 설치]를 선택해 주세요');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      toast('앱 설치가 시작되었습니다');
+      $('installBtn').style.display = 'none';
+    }
+    deferredPrompt = null;
+  };
+}
+
+window.addEventListener('appinstalled', () => {
+  toast('앱 설치가 완료되었습니다!');
+  const btn = $('installBtn');
+  if (btn) btn.style.display = 'none';
+});
+
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
