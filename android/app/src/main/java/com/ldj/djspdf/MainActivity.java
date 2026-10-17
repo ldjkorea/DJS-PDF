@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.Window;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -49,8 +50,11 @@ public class MainActivity extends Activity {
     private static final String APP_URL = "file:///android_asset/index.html";
     private static final String VERSION_URL = "https://ldjkorea.github.io/DJS-PDF/version.json";
     private static final String INCOMING_FILE_NAME = "current_incoming.pdf";
+    private static final int REQUEST_PICK_PDF = 2001;
+    private static final int FILE_CHOOSER_REQUEST_CODE = 2002;
 
     private WebView webView;
+    private ValueCallback<Uri[]> uploadMessage;
     private boolean pageLoaded = false;
     private boolean incomingPdfAvailable = false;
     private String incomingPdfName = null;
@@ -100,6 +104,33 @@ public class MainActivity extends Activity {
             @Override
             public boolean onConsoleMessage(ConsoleMessage cm) {
                 Log.d("DjsPdfJS", "[" + cm.messageLevel() + "] " + cm.message() + " (" + cm.sourceId() + ":" + cm.lineNumber() + ")");
+                return true;
+            }
+
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                if (uploadMessage != null) {
+                    uploadMessage.onReceiveValue(null);
+                    uploadMessage = null;
+                }
+                uploadMessage = filePathCallback;
+
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/pdf");
+                try {
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE);
+                } catch (Exception e) {
+                    Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+                    fallback.addCategory(Intent.CATEGORY_OPENABLE);
+                    fallback.setType("application/pdf");
+                    try {
+                        startActivityForResult(Intent.createChooser(fallback, "PDF 파일 선택"), FILE_CHOOSER_REQUEST_CODE);
+                    } catch (Exception ex) {
+                        uploadMessage = null;
+                        return false;
+                    }
+                }
                 return true;
             }
         });
@@ -332,10 +363,57 @@ public class MainActivity extends Activity {
         }
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_PICK_PDF) {
+            if (resultCode == RESULT_OK && data != null) {
+                Uri uri = data.getData();
+                if (uri != null) {
+                    processIncomingUri(uri);
+                }
+            }
+        } else if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
+            if (uploadMessage == null) return;
+            Uri[] results = null;
+            if (resultCode == RESULT_OK && data != null) {
+                String dataString = data.getDataString();
+                if (dataString != null) {
+                    results = new Uri[]{Uri.parse(dataString)};
+                } else if (data.getData() != null) {
+                    results = new Uri[]{data.getData()};
+                }
+            }
+            uploadMessage.onReceiveValue(results);
+            uploadMessage = null;
+        }
+    }
+
     public class AndroidBridge {
         @JavascriptInterface
         public boolean isNativeApp() {
             return true;
+        }
+
+        @JavascriptInterface
+        public void pickFile() {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/pdf");
+                try {
+                    startActivityForResult(intent, REQUEST_PICK_PDF);
+                } catch (Exception e) {
+                    Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+                    fallback.addCategory(Intent.CATEGORY_OPENABLE);
+                    fallback.setType("application/pdf");
+                    try {
+                        startActivityForResult(Intent.createChooser(fallback, "PDF 파일 선택"), REQUEST_PICK_PDF);
+                    } catch (Exception ex) {
+                        Toast.makeText(MainActivity.this, "파일 선택기를 열 수 없습니다.", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
         }
 
         @JavascriptInterface
