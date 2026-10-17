@@ -92,6 +92,8 @@ public class MainActivity extends Activity {
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
+        settings.setAllowFileAccessFromFileURLs(true);
+        settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setUseWideViewPort(true);
@@ -269,10 +271,10 @@ public class MainActivity extends Activity {
     }
 
     private void notifyPdfToWeb(String fileName) {
-        String safeName = fileName.replace("\\", "\\\\").replace("'", "\\'");
-        Log.i("DjsPdf", "notifyPdfToWeb invoking openIncomingFromNative for: " + safeName);
+        String quotedName = JSONObject.quote(fileName);
+        Log.i("DjsPdf", "notifyPdfToWeb invoking openIncomingFromNative for: " + quotedName);
         String js = "(function() {" +
-                "  var name = '" + safeName + "';" +
+                "  var name = " + quotedName + ";" +
                 "  if (window.openIncomingFromNative) {" +
                 "    window.openIncomingFromNative(name);" +
                 "  } else {" +

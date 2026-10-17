@@ -998,7 +998,7 @@ window.addEventListener('appinstalled', () => {
   if (btn) btn.style.display = 'none';
 });
 
-if('serviceWorker' in navigator){
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js?v=4').then(reg => {
       reg.update();
