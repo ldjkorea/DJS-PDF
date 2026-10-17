@@ -311,6 +311,10 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       <span>또는 화면에 파일을 끌어다 놓으세요</span>
     </div>
+    <div id="appVersionBadge" style="margin-top:14px;font-size:12px;color:var(--muted-soft);cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);transition:background .2s;" title="업데이트 확인">
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent)"></span>
+      <span id="versionText">DJS PDF v1.0.0</span>
+    </div>
   </div>
 
   <div class="recent" id="recentBox" style="display:none">
@@ -993,6 +997,67 @@ if('serviceWorker' in navigator){
     }).catch(err => console.warn('SW register error:', err));
   });
 }
+
+/* ── 네이티브 앱 연동 브리지 (Android Intent & File Handler) ── */
+window.openIncomingFromNative = async function(fileName) {
+  try {
+    showLoader('PDF 불러오는 중…');
+    curName = fileName || '외부문서.pdf';
+    const res = await fetch('./incoming.pdf?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const buffer = await res.arrayBuffer();
+    docKey = 'pdf::' + curName + '::' + buffer.byteLength;
+    await idbSaveFile(docKey, buffer);
+    await loadDoc(new Uint8Array(buffer), 1, 0, 'filter-default');
+    if (window.AndroidBridge && window.AndroidBridge.onPdfLoaded) {
+      window.AndroidBridge.onPdfLoaded();
+    }
+  } catch(err) {
+    console.error('Failed to open incoming PDF:', err);
+    hideLoader();
+    toast('외부 PDF 열기 실패: ' + err.message);
+  }
+};
+
+window.handleBackPressed = function() {
+  if (pwdModal && pwdModal.classList.contains('on')) {
+    pwdModal.classList.remove('on');
+    return 'Y';
+  }
+  if (viewer && viewer.classList.contains('on')) {
+    $('homeBtn').click();
+    return 'Y';
+  }
+  return 'N';
+};
+
+function initNativeBridge() {
+  if (window.AndroidBridge) {
+    const btn = $('installBtn');
+    if (btn) btn.style.display = 'none';
+    const verBadge = $('appVersionBadge');
+    if (verBadge && window.AndroidBridge.getAppVersion) {
+      $('versionText').textContent = 'DJS PDF v' + window.AndroidBridge.getAppVersion();
+    }
+    if (window.AndroidBridge.hasIncomingPdf && window.AndroidBridge.hasIncomingPdf()) {
+      const name = window.AndroidBridge.getIncomingPdfName();
+      window.openIncomingFromNative(name);
+    }
+  }
+}
+
+if ($('appVersionBadge')) {
+  $('appVersionBadge').onclick = () => {
+    if (window.AndroidBridge && window.AndroidBridge.checkUpdate) {
+      window.AndroidBridge.checkUpdate();
+    } else {
+      toast('최신 버전(v1.0.0)입니다');
+    }
+  };
+}
+
+window.addEventListener('DOMContentLoaded', initNativeBridge);
+window.addEventListener('load', initNativeBridge);
 </script>
 </body>
 </html>

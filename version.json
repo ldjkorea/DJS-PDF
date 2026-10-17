@@ -1,0 +1,6 @@
+{
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "apkUrl": "https://github.com/ldjkorea/djs-pdf/releases/download/v1.0.0/djs-pdf-v1.0.0.apk",
+  "releaseNotes": "DJS PDF 1.0.0 출시\n- 카카오톡, 파일관리자 등 외부 PDF 연결 프로그램(Open with) 지원\n- 4가지 읽기 테마(기본/다크/세피아/눈편한), 텍스트 드래그 및 복사 지원\n- 고해상도 앱 아이콘 및 자동 업데이트 지원"
+}
