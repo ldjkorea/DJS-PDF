@@ -1,0 +1,11 @@
+# Gradle & Android build artifacts
+.gradle/
+build/
+app/build/
+*.apk
+*.ap_
+*.aab
+local.properties
+.DS_Store
+Thumbs.db
+test_sample.pdf
