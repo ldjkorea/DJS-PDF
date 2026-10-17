@@ -1063,9 +1063,24 @@ function initNativeBridge() {
     if (verBadge && window.AndroidBridge.getAppVersion) {
       $('versionText').textContent = 'DJS PDF v' + window.AndroidBridge.getAppVersion();
     }
-    if (window.AndroidBridge.hasIncomingPdf && window.AndroidBridge.hasIncomingPdf()) {
-      const name = window.AndroidBridge.getIncomingPdfName();
-      window.openIncomingFromNative(name);
+    
+    // 네이티브에서 전달된 PDF가 있는지 지속 확인 (백그라운드 스트림 수신 대기)
+    const checkIncoming = () => {
+      if (window.AndroidBridge.hasIncomingPdf && window.AndroidBridge.hasIncomingPdf()) {
+        const name = window.AndroidBridge.getIncomingPdfName();
+        window.openIncomingFromNative(name);
+        return true;
+      }
+      return false;
+    };
+
+    if (!checkIncoming()) {
+      let retries = 25;
+      const pollTimer = setInterval(() => {
+        if (checkIncoming() || --retries <= 0) {
+          clearInterval(pollTimer);
+        }
+      }, 150);
     }
   }
 }
