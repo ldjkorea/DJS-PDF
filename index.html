@@ -648,6 +648,7 @@ async function renderPage(n, resetScroll){
         textLayer.innerHTML = '';
         textLayer.style.width = canvas.style.width;
         textLayer.style.height = canvas.style.height;
+        textLayer.style.setProperty('--scale-factor', eff);
         const textViewport = page.getViewport({ scale: eff, rotation: curRotation });
         pdfjsLib.renderTextLayer({
           textContentSource: textContent,
