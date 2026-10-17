@@ -518,7 +518,14 @@ const FILTER_NAMES = { 'filter-default': '기본 모드', 'filter-dark': '다크
 let curFilterIndex = 0;
 
 /* ── 파일 열기 처리 ── */
-function pickFile(){ fileInput.value=''; fileInput.click(); }
+function pickFile(){
+  if (window.AndroidBridge && window.AndroidBridge.pickFile) {
+    window.AndroidBridge.pickFile();
+  } else {
+    fileInput.value='';
+    fileInput.click();
+  }
+}
 $('openMain').onclick=pickFile;
 $('openBtn2').onclick=pickFile;
 
