@@ -34,9 +34,9 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // CDN 외부 요청(Pretendard 폰트 등)은 네트워크 직접 통과
+  // CDN 외부 요청 및 가상 incoming.pdf 요청은 네트워크/네이티브 직접 통과
   const url = e.request.url;
-  if (url.includes('cdn.jsdelivr.net') || url.includes('fonts.googleapis.com')) {
+  if (url.includes('cdn.jsdelivr.net') || url.includes('fonts.googleapis.com') || url.includes('incoming.pdf')) {
     return;
   }
 

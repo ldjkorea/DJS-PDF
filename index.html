@@ -1003,9 +1003,33 @@ window.openIncomingFromNative = async function(fileName) {
   try {
     showLoader('PDF 불러오는 중…');
     curName = fileName || '외부문서.pdf';
-    const res = await fetch('./incoming.pdf?t=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const buffer = await res.arrayBuffer();
+
+    let buffer = null;
+    // 1순위: 네이티브 브리지에서 직접 Base64 데이터 수신 (서비스 워커/네트워크 간섭 방지)
+    if (window.AndroidBridge && window.AndroidBridge.getIncomingPdfBase64) {
+      try {
+        const b64 = window.AndroidBridge.getIncomingPdfBase64();
+        if (b64 && b64.length > 0) {
+          const binStr = atob(b64);
+          const len = binStr.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binStr.charCodeAt(i);
+          }
+          buffer = bytes.buffer;
+        }
+      } catch(e) {
+        console.warn('Bridge base64 fallback to fetch:', e);
+      }
+    }
+
+    // 2순위: 가상 스트림 URL fetch
+    if (!buffer) {
+      const res = await fetch('./incoming.pdf?t=' + Date.now());
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      buffer = await res.arrayBuffer();
+    }
+
     docKey = 'pdf::' + curName + '::' + buffer.byteLength;
     await idbSaveFile(docKey, buffer);
     await loadDoc(new Uint8Array(buffer), 1, 0, 'filter-default');
