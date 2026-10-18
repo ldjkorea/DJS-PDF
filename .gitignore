@@ -9,3 +9,5 @@ local.properties
 .DS_Store
 Thumbs.db
 test_sample.pdf
+screen*.png
+cur_screen*.png

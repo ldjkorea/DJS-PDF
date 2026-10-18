@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
-  "versionName": "1.1.0",
-  "apkUrl": "https://github.com/ldjkorea/djs-pdf/releases/download/v1.1.0/djs-pdf-v1.1.0.apk",
-  "releaseNotes": "DJS PDF 1.1.0 대규모 기능 업데이트\n- 본문 검색(Ctrl+F) 및 실시간 텍스트 하이라이트\n- 하단 페이지 스크러버(Scrubber) 슬라이더 초고속 탐색\n- PDF 목차(TOC) 사이드 드로어 지원\n- 물리 볼륨 버튼(Up/Down) 페이지 넘김\n- 화면 꺼짐 방지(Stay-Awake) 및 원터치 공유(Share)\n- 최근 문서 검색 필터 및 중요 문서 상단 고정(Pin)"
+  "versionCode": 3,
+  "versionName": "1.2.0",
+  "apkUrl": "https://github.com/ldjkorea/DJS-PDF/releases/download/v1.2.0/DJS-PDF-v1.2.0.apk",
+  "releaseNotes": "DJS PDF 1.2.0 대규모 기능 업데이트\n- 연속 세로 스크롤 모드(웹툰형 무한 스크롤) 추가 및 단면 보기 원터치 전환\n- 사용자 페이지 책갈피(북마크) 등록/관리 시스템 및 IndexedDB 영속화\n- 목차 & 책갈피 통합 서랍 및 탭 전환 지원\n- 물리 볼륨키 페이지 넘김 ON/OFF 설정 토글\n- 가로 너비 맞춤 / 전체 페이지 맞춤(Fit Page) 원터치 토글"
 }
