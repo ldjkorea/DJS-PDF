@@ -13,3 +13,4 @@ screen*.png
 cur_screen*.png
 node_modules/
 _QA/
+RELEASES/**/version-candidate.json

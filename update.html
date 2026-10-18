@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="description" content="DJS PDF 1.2.1 Android 업데이트. 기존 앱을 삭제하지 않고 문서와 책갈피를 이어서 사용하세요.">
+  <meta name="theme-color" content="#171512">
+  <link rel="icon" href="favicon.png">
+  <title>DJS PDF 1.2.1 업데이트</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#171512;color:#f4efe5;line-height:1.7}
+    *{box-sizing:border-box}body{margin:0}main{max-width:740px;margin:auto;padding:52px 24px 40px}
+    .brand{display:flex;align-items:center;gap:12px;color:#ded2b9;font-weight:650}.brand img{border-radius:14px}
+    .status{display:inline-block;margin-top:38px;padding:4px 12px;border:1px solid #655132;border-radius:24px;color:#efc36a;font-size:13px}
+    h1{font-size:clamp(30px,6vw,46px);line-height:1.25;letter-spacing:-1.2px;margin:18px 0 14px}h2{font-size:20px;margin:0 0 12px}
+    p{margin:0 0 18px}.lead{color:#c4bcaf;font-size:18px;max-width:580px}.card{border:1px solid #423a2d;background:#211e19;border-radius:20px;padding:25px;margin:26px 0}
+    .preserve{border-color:#806334;background:#2c2418}.preserve h2{color:#f2c675}.small{font-size:14px;color:#bcb2a0}
+    a{color:#eac16d;text-underline-offset:4px}a:focus-visible,summary:focus-visible{outline:3px solid #f4d17e;outline-offset:5px}
+    .download{display:flex;align-items:center;justify-content:center;min-height:56px;padding:15px 22px;background:#d6aa50;color:#20190e;border-radius:12px;font-weight:750;font-size:17px;text-decoration:none;text-align:center}
+    .download:hover{background:#ecc371}.download-meta{text-align:center;margin:10px 0 0;font-size:13px;color:#bcb2a0}
+    ol,ul{padding-left:23px;margin:0}li+li{margin-top:12px}strong{color:#fff0cc}details{border-top:1px solid #423a2d;padding-top:18px;margin-top:26px}
+    summary{cursor:pointer;font-weight:600}dl{margin:16px 0}dt{color:#bcb2a0;font-size:13px;margin-top:12px}dd{margin:2px 0;overflow-wrap:anywhere}code{font-size:12px;line-height:1.8}
+    footer{padding-top:10px;color:#bcb2a0;font-size:14px;display:flex;gap:18px;flex-wrap:wrap}@media(max-width:420px){main{padding:28px 18px}.card{padding:20px}.lead{font-size:16px}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand"><img src="icon-192.png" width="44" height="44" alt="">DJS PDF</div>
+  <span class="status">정식 업데이트 · 2026.10.19</span>
+  <h1>DJS PDF 1.2.1</h1>
+  <p class="lead">저장해 둔 문서와 책갈피를 이어서.<br>PDF 열기·읽기·공유를 더 안정적으로 개선했습니다.</p>
+  <section class="card preserve" aria-labelledby="preserve-title">
+    <h2 id="preserve-title">기존 앱 위에 업데이트하세요</h2>
+    <p>앱에 저장된 문서, 책갈피, 읽던 페이지를 유지하도록 기존 앱과 같은 서명과 저장 공간을 사용합니다.</p>
+    <p class="small" style="margin-bottom:0"><strong>기존 앱 삭제·데이터 초기화는 하지 마세요.</strong> 서명이 다르다는 설치 오류가 나오면 기존 앱을 삭제하지 말고 설치를 중단하세요.</p>
+  </section>
+  <a class="download" id="apkDownload" href="https://github.com/ldjkorea/DJS-PDF/releases/download/v1.2.1/DJS-PDF-v1.2.1.apk">1.2.1 업데이트 APK 다운로드</a>
+  <p class="download-meta">Android 8.0 이상 · 1.15 MB · versionCode 4</p>
+  <section class="card" aria-labelledby="install-title">
+    <h2 id="install-title">업데이트 방법</h2>
+    <ol>
+      <li>위 버튼으로 APK를 받거나 DJS PDF 앱의 <strong>업데이트 확인</strong>을 누릅니다.</li>
+      <li>받은 APK를 열고 Android 설치 화면에서 <strong>업데이트</strong>를 선택합니다. 처음 설치하는 출처라면 Android의 설치 허용 안내를 따릅니다.</li>
+      <li>DJS PDF를 열어 <strong>최근 문서와 책갈피</strong>를 이어서 사용합니다.</li>
+    </ol>
+  </section>
+  <section aria-labelledby="changes-title">
+    <h2 id="changes-title">이번에 개선한 점</h2>
+    <ul>
+      <li>같은 이름의 다른 PDF를 구분하고 문서와 책갈피를 함께 안전하게 저장합니다.</li>
+      <li>암호 재시도·취소와 손상 파일 처리를 개선해 읽던 문서를 유지합니다.</li>
+      <li>검색·페이지 맞춤·연속 스크롤·모바일 화면과 현재 문서 공유를 개선했습니다.</li>
+      <li>PDF 실행 경계와 업데이트 파일의 무결성 확인을 강화했습니다.</li>
+    </ul>
+  </section>
+  <details>
+    <summary>검증 범위와 설치 파일 정보</summary>
+    <p class="small" style="margin-top:16px">실제 SM-S942N의 1.2.0→1.2.1 업데이트에서 기존 문서·책갈피·앱 설정 보존을 확인했습니다. 합성 PDF 열기, 책갈피 재열기, Android 볼륨키 이벤트, 공유창 호출과 로컬 수신 파일도 검사했습니다. 기종별 동작과 일반 수신 앱의 실제 발송은 다를 수 있습니다. 전체 검증 범위는 릴리스 노트를 확인하세요.</p>
+    <dl>
+      <dt>패키지</dt><dd>com.ldj.djspdf</dd>
+      <dt>파일 크기</dt><dd>1,152,206 bytes</dd>
+      <dt>APK SHA-256</dt><dd><code>6fda660a48d57b0226014dce38dfe5ab2d555069eaf5d06d52dee08bcc2ada63</code></dd>
+      <dt>서명 SHA-256</dt><dd><code>63c4d2868987dfc9be77e3321df5925a7051e585e49538e5bdfac0df45a5a9e5</code></dd>
+    </dl>
+    <p class="small">과거 버전에서 이미 덮어쓴 원본 PDF는 이번 업데이트로 복구할 수 없습니다.</p>
+  </details>
+  <footer>
+    <a href="https://github.com/ldjkorea/DJS-PDF/releases/tag/v1.2.1">릴리스 노트</a>
+    <a href="./">웹 PDF 리더 열기</a>
+    <a href="https://github.com/ldjkorea/DJS-PDF">소스 코드</a>
+  </footer>
+</main>
+</body>
+</html>

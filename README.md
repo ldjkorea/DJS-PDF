@@ -1,8 +1,14 @@
 # DJS PDF
 
 광고 없는 PDF 읽기 앱. 웹/PWA와 Android WebView 앱이 같은 읽기 코드를 사용합니다.
-현재 로컬 수정본은 **1.2.1 / code 4**이며 공개 배포본은 아직 **1.2.0 / code 3**입니다.
-로컬 수정·빌드와 GitHub push·Pages 배포·Release 공개는 별도입니다.
+현재 공개 Android 버전은 **1.2.1 / code 4**입니다.
+
+- [Android 업데이트 안내](https://ldjkorea.github.io/DJS-PDF/update.html)
+- [정식 릴리스와 APK](https://github.com/ldjkorea/DJS-PDF/releases/tag/v1.2.1)
+- [웹 PDF 리더](https://ldjkorea.github.io/DJS-PDF/)
+
+**기존 앱을 삭제하거나 데이터를 초기화하지 말고 업데이트 설치하세요.**
+같은 패키지·서명·파일 origin·DB를 유지해 문서와 책갈피를 이어받습니다.
 
 ## 소스와 저장 데이터
 
@@ -85,7 +91,7 @@ adb -s <전용시험기기> shell am instrument -w -e phase fixed com.ldj.djspdf
 manifest·해시가 일치하는 합성 공유 캐시만 정리합니다. 마지막에 이번에 설치한
 `com.ldj.djspdf.test`만 제거합니다. 본 앱 `com.ldj.djspdf`를 제거하면 안 됩니다.
 
-## 배포 준비
+## 배포와 공개 업데이트
 
 루트 `version.json`은 현재 공개 APK를 가리키는 계약으로 유지합니다. 새 APK를
 공개하기 전에만 검증된 새 버전·코드·URL·SHA-256을 함께 반영합니다. 아직 존재하지 않는
@@ -93,3 +99,15 @@ manifest·해시가 일치하는 합성 공유 캐시만 정리합니다. 마지
 막으며 앱도 다운로드 해시·패키지·버전·서명을 추가 확인합니다.
 
 Push·Pages 배포·GitHub Release 생성·Drive 전달은 사용자가 요청한 범위에서만 수행합니다.
+
+1.2.1 공개 APK는 실제 휴대폰에서 확인한 파일을 그대로 게시했습니다. 서명·패키지·
+크기·SHA-256과 검증 범위는 `RELEASES/1.2.1/RELEASE-NOTES.md` 및 고정 manifest인
+`RELEASES/1.2.1/version.json`에 기록합니다. Git 태그 `v1.2.1`은 검증한 앱 소스이고,
+이후 Pages 배포 커밋은 공개 업데이트 JSON·안내 페이지·HTTP 서비스 워커 라우팅을
+갱신합니다. APK 안의 사전 공개 업데이트 JSON·SW 캐시 세대는 빌드 시점 값이며,
+Android는 파일 origin에서 SW를 등록하지 않고 업데이트 JSON을 HTTPS로 확인합니다.
+APK를 다시 빌드하여 이미 검증·공개한 파일을 교체하지 않습니다.
+
+Pages는 `main` 루트에서 배포합니다. `update.html`은 기존 앱 삭제 없이 업데이트하는
+방법과 APK 링크를 안내하며 개인 문서·책갈피를 서버로 전송하지 않습니다. 서비스 워커의
+리더 HTML fallback은 리더 경로에만 적용해 업데이트 페이지를 가리지 않게 합니다.

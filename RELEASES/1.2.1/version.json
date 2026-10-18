@@ -1,0 +1,13 @@
+{
+  "versionCode": 4,
+  "versionName": "1.2.1",
+  "apkUrl": "https://github.com/ldjkorea/DJS-PDF/releases/download/v1.2.1/DJS-PDF-v1.2.1.apk",
+  "releaseNotes": "DJS PDF 1.2.1 안정성 업데이트\n- 기존 문서·책갈피·읽던 페이지를 이어받는 업데이트\n- 같은 이름의 PDF 구분, 암호 재시도·취소 및 손상 파일 처리 개선\n- 검색·페이지 맞춤·연속 스크롤·모바일 화면 개선\n- 현재 문서 공유와 파일 접근·업데이트 무결성 검증 강화\n\n기존 앱을 삭제하거나 데이터를 초기화하지 말고 업데이트 설치하세요.",
+  "sha256": "6fda660a48d57b0226014dce38dfe5ab2d555069eaf5d06d52dee08bcc2ada63",
+  "size": 1152206,
+  "signerSha256": "63c4d2868987dfc9be77e3321df5925a7051e585e49538e5bdfac0df45a5a9e5",
+  "published": true,
+  "publishedAt": "2026-10-18T17:37:45Z",
+  "sourceCommit": "f37699d2d8ee65858fa803c9926784e296fca207",
+  "releaseUrl": "https://github.com/ldjkorea/DJS-PDF/releases/tag/v1.2.1"
+}
