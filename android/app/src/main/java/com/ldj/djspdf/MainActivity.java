@@ -15,8 +15,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -60,6 +62,8 @@ public class MainActivity extends Activity {
     private String incomingPdfName = null;
     private String appVersionName = "1.0.0";
     private long appVersionCode = 1;
+    private boolean isViewerActive = false;
+    private boolean volumeKeyNavEnabled = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -213,6 +217,20 @@ public class MainActivity extends Activity {
         handleIntent(intent);
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isViewerActive) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
     private void handleIntent(Intent intent) {
         if (intent == null) return;
         String action = intent.getAction();
@@ -353,6 +371,34 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (isViewerActive && volumeKeyNavEnabled) {
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                if (webView != null) {
+                    webView.evaluateJavascript("if (window.gotoPage && typeof window.pageNum === 'number') { window.gotoPage(window.pageNum - 1); }", null);
+                }
+                return true;
+            } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                if (webView != null) {
+                    webView.evaluateJavascript("if (window.gotoPage && typeof window.pageNum === 'number') { window.gotoPage(window.pageNum + 1); }", null);
+                }
+                return true;
+            }
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (isViewerActive && volumeKeyNavEnabled) {
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                return true;
+            }
+        }
+        return super.onKeyUp(keyCode, event);
+    }
+
+    @Override
     public void onBackPressed() {
         if (webView != null) {
             webView.evaluateJavascript("if (window.handleBackPressed) { window.handleBackPressed(); } else { 'N'; }", value -> {
@@ -459,6 +505,87 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void checkUpdate() {
             runOnUiThread(() -> checkAutoUpdate(true));
+        }
+
+        @JavascriptInterface
+        public void setKeepScreenOn(boolean keepOn) {
+            runOnUiThread(() -> {
+                if (keepOn) {
+                    getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                } else {
+                    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void setViewerActive(boolean active) {
+            isViewerActive = active;
+        }
+
+        @JavascriptInterface
+        public void setVolumeKeyNavEnabled(boolean enabled) {
+            volumeKeyNavEnabled = enabled;
+        }
+
+        @JavascriptInterface
+        public void saveCurrentPdfBase64(String base64Data, String fileName) {
+            try {
+                byte[] bytes = Base64.decode(base64Data, Base64.NO_WRAP);
+                File tempPdf = new File(getCacheDir(), INCOMING_FILE_NAME);
+                try (FileOutputStream fos = new FileOutputStream(tempPdf)) {
+                    fos.write(bytes);
+                }
+                incomingPdfName = fileName;
+                Log.i("DjsPdf", "Synced current PDF to cache (" + tempPdf.length() + " bytes): " + fileName);
+            } catch (Exception e) {
+                Log.e("DjsPdf", "saveCurrentPdfBase64 failed", e);
+            }
+        }
+
+        @JavascriptInterface
+        public boolean isCurrentPdfReady(String fileName) {
+            File tempPdf = new File(getCacheDir(), INCOMING_FILE_NAME);
+            return tempPdf.exists() && tempPdf.length() > 0 &&
+                    (fileName == null || fileName.equals(incomingPdfName));
+        }
+
+        @JavascriptInterface
+        public void shareCurrentPdf(String displayName) {
+            runOnUiThread(() -> {
+                File tempPdf = new File(getCacheDir(), INCOMING_FILE_NAME);
+                if (!tempPdf.exists() || tempPdf.length() == 0) {
+                    Toast.makeText(MainActivity.this, "공유할 PDF 문서가 준비되지 않았습니다.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                try {
+                    String cleanName = (displayName != null && !displayName.trim().isEmpty())
+                            ? displayName.trim() : (incomingPdfName != null ? incomingPdfName : "문서.pdf");
+                    if (!cleanName.toLowerCase().endsWith(".pdf")) cleanName += ".pdf";
+
+                    File shareFile = new File(getCacheDir(), cleanName);
+                    try (InputStream in = new FileInputStream(tempPdf);
+                         OutputStream out = new FileOutputStream(shareFile)) {
+                        byte[] buf = new byte[16384];
+                        int len;
+                        while ((len = in.read(buf)) != -1) {
+                            out.write(buf, 0, len);
+                        }
+                        out.flush();
+                    }
+
+                    Uri contentUri = GenericFileProvider.getUriForFile(MainActivity.this, shareFile);
+                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                    shareIntent.setType("application/pdf");
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                    shareIntent.putExtra(Intent.EXTRA_SUBJECT, cleanName);
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(shareIntent, "PDF 문서 공유"));
+                } catch (Exception e) {
+                    Log.e("DjsPdf", "shareCurrentPdf failed", e);
+                    Toast.makeText(MainActivity.this, "문서 공유 실패: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            });
         }
     }
 

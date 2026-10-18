@@ -161,15 +161,15 @@
 
   /* ── 상단 바 ── */
   #topbar{
-    position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;gap:8px;
-    padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;
+    position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;gap:6px;
+    padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;
     background:linear-gradient(180deg,var(--bar),rgba(22,21,19,0));
     backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     transition:transform .25s ease, opacity .25s ease;
   }
   #topbar.hide{transform:translateY(-110%);opacity:0;pointer-events:none}
   .icon-btn{
-    width:38px;height:38px;flex-shrink:0;border:none;border-radius:10px;
+    width:36px;height:36px;flex-shrink:0;border:none;border-radius:10px;
     background:var(--btn);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;
     transition:background .15s, transform .1s;border:1px solid var(--line);
   }
@@ -177,6 +177,107 @@
   .icon-btn:active{background:var(--btn-active);transform:scale(.94)}
   .icon-btn.active{background:var(--btn-active);color:var(--accent);border-color:var(--line-strong)}
   #fileName{flex:1;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);padding:0 4px}
+
+  /* ── 검색 바 (Floating Search Bar) ── */
+  .search-bar{
+    position:fixed;top:calc(env(safe-area-inset-top) + 54px);left:12px;right:12px;z-index:25;
+    background:rgba(26, 24, 21, 0.96);border:1px solid var(--line-strong);border-radius:14px;
+    padding:6px 10px;display:flex;align-items:center;gap:8px;
+    box-shadow:0 12px 32px rgba(0,0,0,0.65), 0 0 16px var(--accent-glow);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    transition:transform .22s ease, opacity .22s ease;
+  }
+  .search-bar.hide{transform:translateY(-140%);opacity:0;pointer-events:none}
+  .sb-input-wrap{flex:1;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.28);border-radius:9px;padding:6px 10px;border:1px solid var(--line)}
+  .sb-input-wrap svg{color:var(--muted);flex-shrink:0}
+  #searchInput{flex:1;background:transparent;border:none;color:var(--text);font-size:14px;outline:none}
+  #searchInput::placeholder{color:var(--muted-soft)}
+  #searchCount{font-size:11.5px;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .sb-btn{width:32px;height:32px;border-radius:8px}
+
+  /* ── 텍스트 검색 하이라이트 ── */
+  mark.search-match{
+    background:rgba(212, 167, 71, 0.45);color:inherit;border-radius:2px;
+  }
+  mark.search-match.active{
+    background:var(--accent);color:#161513;font-weight:700;box-shadow:0 0 8px rgba(212,167,71,0.8);
+  }
+
+  /* ── 하단 페이지 스크러버 슬라이더 ── */
+  .scrubber-row{
+    position:relative;width:100%;max-width:440px;margin:0 auto 6px;
+    display:flex;align-items:center;gap:10px;padding:0 6px;
+  }
+  .scrub-num{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:20px;text-align:center}
+  #pageSlider{
+    flex:1;height:5px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.12);
+    border-radius:3px;outline:none;cursor:pointer;
+  }
+  #pageSlider::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 8px rgba(212,167,71,0.6);border:2px solid #161513;cursor:pointer;
+    transition:transform .12s, box-shadow .12s;
+  }
+  #pageSlider:active::-webkit-slider-thumb{transform:scale(1.2);box-shadow:0 0 14px var(--accent)}
+  .scrub-bubble{
+    position:absolute;top:-34px;left:50%;transform:translateX(-50%);
+    background:rgba(30, 27, 24, 0.96);border:1px solid var(--line-strong);border-radius:14px;
+    padding:4px 10px;font-size:12px;font-weight:600;color:var(--accent);
+    box-shadow:0 6px 18px rgba(0,0,0,0.6);pointer-events:none;opacity:0;transition:opacity .15s;
+    font-variant-numeric:tabular-nums;white-space:nowrap;
+  }
+  .scrub-bubble.visible{opacity:1}
+
+  /* ── 목차 (TOC) 드로어 ── */
+  .drawer-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:40;
+    opacity:0;pointer-events:none;transition:opacity .25s ease;
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  }
+  .drawer-backdrop.open{opacity:1;pointer-events:auto}
+  .drawer{
+    position:fixed;top:0;left:0;bottom:0;width:min(320px, 84vw);z-index:42;
+    background:#1c1a17;border-right:1px solid var(--line);
+    display:flex;flex-direction:column;
+    transform:translateX(-100%);transition:transform .25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow:10px 0 32px rgba(0,0,0,0.5);
+  }
+  .drawer.open{transform:translateX(0)}
+  .drawer-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:calc(env(safe-area-inset-top) + 14px) 16px 14px;
+    border-bottom:1px solid var(--line);background:rgba(22,21,19,0.7);
+  }
+  .drawer-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--text)}
+  .drawer-title svg{color:var(--accent)}
+  .drawer-body{flex:1;overflow-y:auto;padding:8px 0;-webkit-overflow-scrolling:touch}
+  .toc-item{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:11px 16px;cursor:pointer;color:var(--text);font-size:13.5px;
+    border-bottom:1px solid rgba(255,255,255,0.03);transition:background .15s, color .15s;
+  }
+  .toc-item:hover{background:rgba(255,255,255,0.06);color:var(--accent)}
+  .toc-item:active{background:var(--btn-active)}
+  .toc-item.level-1{padding-left:28px;font-size:13px;color:var(--muted)}
+  .toc-item.level-2{padding-left:42px;font-size:12.5px;color:var(--muted-soft)}
+  .toc-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .toc-page{font-size:11.5px;color:var(--muted-soft);margin-left:8px;font-variant-numeric:tabular-nums}
+
+  /* ── 최근 본 문서 검색 & 핀 ── */
+  .recent-search-row{
+    display:flex;align-items:center;gap:8px;background:var(--card-bg);
+    border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px;
+  }
+  .recent-search-row svg{color:var(--muted-soft);flex-shrink:0}
+  #recentSearchInput{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:13px}
+  #recentSearchInput::placeholder{color:var(--muted-soft)}
+  .recent-pin{
+    width:28px;height:28px;border:none;border-radius:8px;background:transparent;
+    color:var(--muted-soft);cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:background .12s, color .12s, transform .1s;flex-shrink:0;
+  }
+  .recent-pin:hover{background:rgba(255,255,255,0.08);color:var(--accent)}
+  .recent-pin.pinned{color:var(--accent)}
 
   /* ── 하단 바 ── */
   #bottombar{
@@ -313,7 +414,7 @@
     </div>
     <div id="appVersionBadge" style="margin-top:14px;font-size:12px;color:var(--muted-soft);cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);transition:background .2s;" title="업데이트 확인">
       <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent)"></span>
-      <span id="versionText">DJS PDF v1.0.0</span>
+      <span id="versionText">DJS PDF v1.1.0</span>
     </div>
   </div>
 
@@ -321,6 +422,11 @@
     <div class="recent-head">
       <div class="rtitle">최근 본 문서</div>
       <button class="clear-btn" id="clearRecentsBtn">기록 지우기</button>
+    </div>
+    <div class="recent-search-row">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="recentSearchInput" placeholder="최근 문서 제목 검색…">
+      <button id="clearRecentSearch" style="display:none;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">✕</button>
     </div>
     <div class="recent-list" id="recentList"></div>
   </div>
@@ -336,14 +442,38 @@
   </div>
 </div>
 
+<!-- ── 목차 (TOC) 드로어 & 백드롭 ── -->
+<div id="tocBackdrop" class="drawer-backdrop"></div>
+<div id="tocDrawer" class="drawer">
+  <div class="drawer-header">
+    <div class="drawer-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>문서 목차</span>
+    </div>
+    <button class="icon-btn" id="closeTocBtn" aria-label="목차 닫기">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="tocList"></div>
+</div>
+
 <!-- ── 상단 툴바 ── -->
 <div id="topbar" class="hide">
-  <button class="icon-btn" id="homeBtn" aria-label="홈으로">
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+  <button class="icon-btn" id="homeBtn" aria-label="홈으로" title="홈으로">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+  </button>
+  <button class="icon-btn" id="tocBtn" aria-label="목차" title="문서 목차 (TOC)" style="display:none">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
   </button>
   <div id="fileName">문서</div>
+  <button class="icon-btn" id="searchBtn" aria-label="검색" title="문서 내 검색 (Ctrl+F)">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  </button>
   <button class="icon-btn" id="filterBtn" aria-label="읽기 테마 모드" title="기본 / 다크 / 세피아 / 눈편한 모드">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+  </button>
+  <button class="icon-btn" id="shareBtn" aria-label="문서 공유" title="문서 공유">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
   </button>
   <button class="icon-btn" id="rotateBtn" aria-label="90도 회전" title="시계방향 90도 회전">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
@@ -353,8 +483,33 @@
   </button>
 </div>
 
+<!-- ── 플로팅 검색 바 ── -->
+<div id="searchBar" class="search-bar hide">
+  <div class="sb-input-wrap">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="searchInput" placeholder="문서 내 검색…" autocomplete="off">
+    <span id="searchCount">0 / 0</span>
+  </div>
+  <button class="icon-btn sb-btn" id="searchPrevBtn" aria-label="이전 찾기" title="이전 결과 (Shift+Enter)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="18 15 12 9 6 15"/></svg>
+  </button>
+  <button class="icon-btn sb-btn" id="searchNextBtn" aria-label="다음 찾기" title="다음 결과 (Enter)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+  </button>
+  <button class="icon-btn sb-btn" id="searchCloseBtn" aria-label="검색 닫기" title="닫기 (ESC)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+</div>
+
 <!-- ── 하단 툴바 ── -->
 <div id="bottombar" class="hide">
+  <!-- 페이지 스크러버 슬라이더 -->
+  <div class="scrubber-row">
+    <div class="scrub-bubble" id="scrubBubble">1 / 1 쪽</div>
+    <span class="scrub-num" id="scrubMin">1</span>
+    <input type="range" id="pageSlider" min="1" max="1" value="1" step="1">
+    <span class="scrub-num" id="scrubMax">1</span>
+  </div>
   <div class="row">
     <button class="nav-btn" id="prevBtn" aria-label="이전 페이지">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -367,8 +522,6 @@
     <button class="nav-btn" id="nextBtn" aria-label="다음 페이지">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
     </button>
-  </div>
-  <div class="row">
     <div class="zoombox">
       <button class="z-btn" id="zoomOut" aria-label="축소">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>
@@ -425,7 +578,10 @@ const welcome=$('welcome'), viewer=$('viewer'), wrap=$('canvasWrap'),
       textLayer=$('textLayer'),
       topbar=$('topbar'), bottombar=$('bottombar'), loader=$('loader'), loadMsg=$('loadMsg'),
       toastEl=$('toast'), fileInput=$('fileInput'),
-      dropOverlay=$('dropOverlay'), pwdModal=$('pwdModal');
+      dropOverlay=$('dropOverlay'), pwdModal=$('pwdModal'),
+      searchBar=$('searchBar'), searchInput=$('searchInput'), searchCount=$('searchCount'),
+      tocDrawer=$('tocDrawer'), tocBackdrop=$('tocBackdrop'), tocList=$('tocList'),
+      pageSlider=$('pageSlider'), scrubBubble=$('scrubBubble'), scrubMax=$('scrubMax');
 
 /* ── IndexedDB 저장소 (DjsPdfDB_v2) ── */
 const DB_NAME = 'DjsPdfDB_v2';
@@ -517,6 +673,289 @@ const FILTERS = ['filter-default', 'filter-dark', 'filter-sepia', 'filter-green'
 const FILTER_NAMES = { 'filter-default': '기본 모드', 'filter-dark': '다크 읽기 모드', 'filter-sepia': '세피아 모드', 'filter-green': '눈편한 모드' };
 let curFilterIndex = 0;
 
+/* ── 화면 꺼짐 방지 (WakeLock & Native) ── */
+let wakeLock = null;
+async function requestWakeLock(){
+  if(window.AndroidBridge && window.AndroidBridge.setKeepScreenOn){
+    window.AndroidBridge.setKeepScreenOn(true);
+  }
+  if('wakeLock' in navigator){
+    try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(_){}
+  }
+}
+function releaseWakeLock(){
+  if(window.AndroidBridge && window.AndroidBridge.setKeepScreenOn){
+    window.AndroidBridge.setKeepScreenOn(false);
+  }
+  if(wakeLock){
+    wakeLock.release().catch(()=>{});
+    wakeLock = null;
+  }
+}
+
+/* ── 문서 공유 (Native Intent & Web Share) ── */
+async function shareCurrentDoc(){
+  if(!pdfDoc) return;
+  showLoader('공유 준비 중…');
+  try{
+    if(window.AndroidBridge && window.AndroidBridge.shareCurrentPdf){
+      if(window.AndroidBridge.isCurrentPdfReady && !window.AndroidBridge.isCurrentPdfReady(curName)){
+        const buf = await idbGetFile(docKey);
+        if(buf && buf.byteLength < 35 * 1024 * 1024){
+          let binary = '';
+          const bytes = new Uint8Array(buf);
+          const len = bytes.byteLength;
+          for(let i=0; i<len; i+=8192){
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + 8192, len)));
+          }
+          if(window.AndroidBridge.saveCurrentPdfBase64){
+            window.AndroidBridge.saveCurrentPdfBase64(btoa(binary), curName);
+          }
+        }
+      }
+      hideLoader();
+      window.AndroidBridge.shareCurrentPdf(curName);
+      return;
+    }
+    if(navigator.share){
+      const buf = await idbGetFile(docKey);
+      if(buf){
+        const file = new File([buf], curName, { type: 'application/pdf' });
+        hideLoader();
+        await navigator.share({ files: [file], title: curName });
+        return;
+      }
+    }
+    hideLoader();
+    toast('현재 환경에서는 파일 공유를 지원하지 않습니다');
+  }catch(err){
+    hideLoader();
+    if(err.name !== 'AbortError') toast('공유 실패: ' + err.message);
+  }
+}
+$('shareBtn').onclick = shareCurrentDoc;
+
+/* ── 목차 (TOC) 드로어 ── */
+function openTocDrawer(){
+  tocDrawer.classList.add('open');
+  tocBackdrop.classList.add('open');
+}
+function closeTocDrawer(){
+  tocDrawer.classList.remove('open');
+  tocBackdrop.classList.remove('open');
+}
+$('tocBtn').onclick = openTocDrawer;
+$('closeTocBtn').onclick = closeTocDrawer;
+$('tocBackdrop').onclick = closeTocDrawer;
+
+async function navigateToDest(dest){
+  try{
+    let explicitDest = dest;
+    if(typeof dest === 'string'){
+      explicitDest = await pdfDoc.getDestination(dest);
+    }
+    if(Array.isArray(explicitDest)){
+      const destRef = explicitDest[0];
+      const pageIndex = await pdfDoc.getPageIndex(destRef);
+      closeTocDrawer();
+      gotoPage(pageIndex + 1);
+    }
+  }catch(err){
+    console.warn('TOC dest navigation failed:', err);
+  }
+}
+
+function buildTocTree(items, level){
+  level = level || 0;
+  if(level === 0) tocList.innerHTML = '';
+  if(!items || !items.length){
+    if(level === 0){
+      tocList.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px">목차가 없는 문서입니다</div>';
+    }
+    return;
+  }
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'toc-item' + (level > 0 ? ' level-' + Math.min(level, 2) : '');
+    const titleText = (item.title || '').trim();
+    el.innerHTML = `<span class="toc-text">${escapeHtml(titleText)}</span>`;
+    if(item.dest){
+      el.onclick = () => navigateToDest(item.dest);
+    }
+    tocList.appendChild(el);
+    if(item.items && item.items.length){
+      buildTocTree(item.items, level + 1);
+    }
+  });
+}
+
+/* ── 본문 검색 & 실시간 하이라이트 ── */
+let searchQuery = '';
+let searchMatches = [];
+let curSearchMatchIdx = -1;
+const pageTextCache = new Map();
+let searchDebounceTimer = null;
+
+function toggleSearchBar(force){
+  const isHidden = searchBar.classList.contains('hide');
+  const shouldShow = force !== undefined ? force : isHidden;
+  searchBar.classList.toggle('hide', !shouldShow);
+  $('searchBtn').classList.toggle('active', shouldShow);
+  if(shouldShow){
+    setTimeout(()=>{ searchInput.focus(); searchInput.select(); }, 120);
+  } else {
+    clearSearchHighlights();
+  }
+}
+$('searchBtn').onclick = () => toggleSearchBar();
+$('searchCloseBtn').onclick = () => toggleSearchBar(false);
+
+function clearSearchHighlights(){
+  searchQuery = '';
+  searchMatches = [];
+  curSearchMatchIdx = -1;
+  searchCount.textContent = '0 / 0';
+  const marks = textLayer.querySelectorAll('mark.search-match');
+  marks.forEach(m => {
+    const parent = m.parentNode;
+    if(parent){
+      parent.replaceChild(document.createTextNode(m.textContent), m);
+      parent.normalize();
+    }
+  });
+}
+
+async function getPageText(num){
+  if(pageTextCache.has(num)) return pageTextCache.get(num);
+  const page = await pdfDoc.getPage(num);
+  const tc = await page.getTextContent();
+  const fullText = tc.items.map(it => it.str).join(' ');
+  const res = { tc, fullText };
+  pageTextCache.set(num, res);
+  return res;
+}
+
+async function performSearch(query){
+  query = (query || '').trim();
+  if(!query || !pdfDoc){
+    clearSearchHighlights();
+    return;
+  }
+  searchQuery = query;
+  searchMatches = [];
+  curSearchMatchIdx = -1;
+  searchCount.textContent = '검색 중…';
+
+  const lowerQuery = query.toLowerCase();
+  for(let i = 1; i <= totalPages; i++){
+    const { fullText } = await getPageText(i);
+    let idx = fullText.toLowerCase().indexOf(lowerQuery);
+    let pageMatchIdx = 0;
+    while(idx !== -1){
+      searchMatches.push({ pageNum: i, matchIndex: pageMatchIdx++ });
+      idx = fullText.toLowerCase().indexOf(lowerQuery, idx + lowerQuery.length);
+    }
+  }
+
+  if(!searchMatches.length){
+    searchCount.textContent = '0 / 0';
+    toast('일치하는 결과가 없습니다');
+    return;
+  }
+
+  let targetIdx = searchMatches.findIndex(m => m.pageNum >= pageNum);
+  if(targetIdx === -1) targetIdx = 0;
+  goToMatch(targetIdx);
+}
+
+function goToMatch(index){
+  if(!searchMatches.length) return;
+  curSearchMatchIdx = (index + searchMatches.length) % searchMatches.length;
+  const match = searchMatches[curSearchMatchIdx];
+  searchCount.textContent = `${curSearchMatchIdx + 1} / ${searchMatches.length}`;
+
+  if(match.pageNum === pageNum){
+    highlightTextLayer();
+  } else {
+    gotoPage(match.pageNum);
+  }
+}
+
+$('searchNextBtn').onclick = () => {
+  if(searchMatches.length) goToMatch(curSearchMatchIdx + 1);
+};
+$('searchPrevBtn').onclick = () => {
+  if(searchMatches.length) goToMatch(curSearchMatchIdx - 1);
+};
+
+searchInput.addEventListener('input', e => {
+  clearTimeout(searchDebounceTimer);
+  const val = e.target.value;
+  searchDebounceTimer = setTimeout(() => performSearch(val), 280);
+});
+searchInput.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    if(e.shiftKey){
+      $('searchPrevBtn').click();
+    } else {
+      $('searchNextBtn').click();
+    }
+  } else if(e.key === 'Escape'){
+    toggleSearchBar(false);
+  }
+});
+
+function highlightTextLayer(){
+  if(!searchQuery || !textLayer) return;
+  const spans = textLayer.querySelectorAll('span');
+  const lowerQ = searchQuery.toLowerCase();
+  const qLen = searchQuery.length;
+
+  spans.forEach(span => {
+    const text = span.textContent;
+    const lowerText = text.toLowerCase();
+    if(!lowerText.includes(lowerQ)) return;
+
+    let html = '';
+    let lastIdx = 0;
+    let idx = lowerText.indexOf(lowerQ);
+    while(idx !== -1){
+      html += escapeHtml(text.slice(lastIdx, idx));
+      html += `<mark class="search-match">${escapeHtml(text.slice(idx, idx + qLen))}</mark>`;
+      lastIdx = idx + qLen;
+      idx = lowerText.indexOf(lowerQ, lastIdx);
+    }
+    html += escapeHtml(text.slice(lastIdx));
+    span.innerHTML = html;
+  });
+
+  const allMarks = textLayer.querySelectorAll('mark.search-match');
+  if(allMarks.length > 0){
+    const curMatch = searchMatches[curSearchMatchIdx];
+    if(curMatch && curMatch.pageNum === pageNum){
+      const activeMark = allMarks[curMatch.matchIndex] || allMarks[0];
+      if(activeMark){
+        activeMark.classList.add('active');
+        activeMark.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+    }
+  }
+}
+
+/* ── 하단 페이지 스크러버 제어 ── */
+pageSlider.addEventListener('input', e => {
+  const val = parseInt(e.target.value) || 1;
+  scrubBubble.textContent = `${val} / ${totalPages} 쪽`;
+  scrubBubble.classList.add('visible');
+  $('pageInput').value = val;
+});
+pageSlider.addEventListener('change', e => {
+  scrubBubble.classList.remove('visible');
+  const val = parseInt(e.target.value) || 1;
+  gotoPage(val);
+});
+
 /* ── 파일 열기 처리 ── */
 function pickFile(){
   if (window.AndroidBridge && window.AndroidBridge.pickFile) {
@@ -598,6 +1037,8 @@ async function loadDoc(data, initialPage, initialRotation, initialFilter){
     zoom = 1;
     $('pageTotal').textContent = totalPages;
     $('pageInput').max = totalPages;
+    pageSlider.max = totalPages;
+    scrubMax.textContent = totalPages;
     $('fileName').textContent = curName.replace(/\.pdf$/i,'');
     
     welcome.style.display = 'none';
@@ -605,6 +1046,30 @@ async function loadDoc(data, initialPage, initialRotation, initialFilter){
     topbar.classList.remove('hide');
     bottombar.classList.remove('hide');
     
+    // Reset search & text cache
+    pageTextCache.clear();
+    clearSearchHighlights();
+    toggleSearchBar(false);
+
+    // Screen Stay-Awake & Native state
+    requestWakeLock();
+    if (window.AndroidBridge && window.AndroidBridge.setViewerActive) {
+      window.AndroidBridge.setViewerActive(true);
+    }
+
+    // Load Document Outline (TOC)
+    try {
+      const outline = await pdfDoc.getOutline();
+      if (outline && outline.length > 0) {
+        $('tocBtn').style.display = 'inline-flex';
+        buildTocTree(outline);
+      } else {
+        $('tocBtn').style.display = 'none';
+      }
+    } catch (_) {
+      $('tocBtn').style.display = 'none';
+    }
+
     await idbSaveMeta({
       key: docKey,
       name: curName,
@@ -657,17 +1122,25 @@ async function renderPage(n, resetScroll){
         textLayer.style.height = canvas.style.height;
         textLayer.style.setProperty('--scale-factor', eff);
         const textViewport = page.getViewport({ scale: eff, rotation: curRotation });
-        pdfjsLib.renderTextLayer({
+        await pdfjsLib.renderTextLayer({
           textContentSource: textContent,
           container: textLayer,
           viewport: textViewport,
           textDivs: []
-        });
+        }).promise;
+
+        // 본문 검색어 하이라이트 적용
+        highlightTextLayer();
       } catch (tErr) { console.warn('TextLayer render error:', tErr); }
     }
     
     pageNum = n;
+    window.pageNum = n;
+    window.totalPages = totalPages;
     $('pageInput').value = n;
+    pageSlider.value = n;
+    pageSlider.max = totalPages;
+    scrubMax.textContent = totalPages;
     $('prevBtn').disabled = (n <= 1);
     $('nextBtn').disabled = (n >= totalPages);
     updateZoomLabel();
@@ -699,6 +1172,7 @@ function gotoPage(n){
   animateFlip(n > pageNum ? 1 : -1);
   renderPage(n, true);
 }
+window.gotoPage = gotoPage;
 function animateFlip(dir){
   wrap.classList.add('flip');
   wrap.style.opacity = '0';
@@ -718,6 +1192,12 @@ function goHome(){
   topbar.classList.add('hide');
   bottombar.classList.add('hide');
   welcome.style.display = 'flex';
+  toggleSearchBar(false);
+  closeTocDrawer();
+  releaseWakeLock();
+  if (window.AndroidBridge && window.AndroidBridge.setViewerActive) {
+    window.AndroidBridge.setViewerActive(false);
+  }
   renderRecent();
 }
 
@@ -853,7 +1333,12 @@ window.addEventListener('drop', e => {
 /* ── 키보드 단축키 ── */
 document.addEventListener('keydown', e => {
   if(!viewer.classList.contains('on')) return;
-  if(e.target === $('pageInput') || e.target === $('pwdInput')) return;
+  if(e.target === $('pageInput') || e.target === $('pwdInput') || e.target === searchInput) return;
+  if((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')){
+    e.preventDefault();
+    toggleSearchBar();
+    return;
+  }
   if(e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' '){
     e.preventDefault(); gotoPage(pageNum + 1);
   } else if(e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp'){
@@ -867,7 +1352,13 @@ document.addEventListener('keydown', e => {
   } else if(e.key === 't' || e.key === 'T'){
     $('filterBtn').click();
   } else if(e.key === 'Escape'){
-    goHome();
+    if(!searchBar.classList.contains('hide')){
+      toggleSearchBar(false);
+    } else if(tocDrawer.classList.contains('open')){
+      closeTocDrawer();
+    } else {
+      goHome();
+    }
   }
 });
 
@@ -875,16 +1366,31 @@ viewer.addEventListener('wheel', e => {
   if(e.ctrlKey){ e.preventDefault(); applyZoom(zoom + (e.deltaY < 0 ? 0.15 : -0.15)); }
 },{passive:false});
 
-/* ── 최근 본 문서 렌더링 (IndexedDB 기반 즉시 열기) ── */
-async function renderRecent(){
+/* ── 최근 본 문서 렌더링 (IndexedDB 기반 즉시 열기, 검색 필터, 상단 고정) ── */
+async function renderRecent(filterText = ''){
   const list = await idbGetAllMeta();
   const box = $('recentBox'), container = $('recentList');
   if(!list.length){ box.style.display = 'none'; return; }
   box.style.display = 'block';
+
+  // Sort: pinned first (descending), then updatedAt (descending)
+  list.sort((a, b) => {
+    if (!!b.pinned !== !!a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+
+  const query = (filterText || '').trim().toLowerCase();
+  const filtered = query ? list.filter(item => item.name.toLowerCase().includes(query)) : list;
+
   container.innerHTML = '';
-  list.slice(0, 8).forEach(item => {
+  if (!filtered.length) {
+    container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted-soft);font-size:12.5px">일치하는 최근 문서가 없습니다</div>';
+    return;
+  }
+
+  filtered.slice(0, 12).forEach(item => {
     const el = document.createElement('div');
-    el.className = 'recent-item';
+    el.className = 'recent-item' + (item.pinned ? ' pinned' : '');
     el.innerHTML = `
       <div class="recent-icon">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
@@ -897,6 +1403,9 @@ async function renderRecent(){
           <span>${formatDate(item.updatedAt)}</span>
         </div>
       </div>
+      <button class="recent-pin ${item.pinned ? 'pinned' : ''}" aria-label="고정" title="${item.pinned ? '상단 고정 해제' : '상단 고정'}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="${item.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      </button>
       <button class="recent-del" aria-label="삭제" title="기록 삭제">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -904,7 +1413,7 @@ async function renderRecent(){
     
     /* 최근 문서 클릭 시 IndexedDB에서 바이너리를 즉시 읽어 열기 */
     el.onclick = async (e) => {
-      if (e.target.closest('.recent-del')) return;
+      if (e.target.closest('.recent-del') || e.target.closest('.recent-pin')) return;
       showLoader('문서 복원 중…');
       const buffer = await idbGetFile(item.key);
       if (!buffer) {
@@ -916,18 +1425,48 @@ async function renderRecent(){
       docKey = item.key;
       loadDoc(new Uint8Array(buffer), item.page, item.rotation, item.filter);
     };
+
+    /* 상단 고정 (Pin) 버튼 */
+    const pinBtn = el.querySelector('.recent-pin');
+    pinBtn.onclick = async (e) => {
+      e.stopPropagation();
+      item.pinned = !item.pinned;
+      await idbSaveMeta(item);
+      const searchBox = $('recentSearchInput');
+      renderRecent(searchBox ? searchBox.value : '');
+      toast(item.pinned ? '상단에 고정되었습니다' : '고정이 해제되었습니다');
+    };
     
     /* 개별 삭제 버튼 */
     const delBtn = el.querySelector('.recent-del');
     delBtn.onclick = async (e) => {
       e.stopPropagation();
       await idbDelete(item.key);
-      renderRecent();
+      const searchBox = $('recentSearchInput');
+      renderRecent(searchBox ? searchBox.value : '');
       toast('기록에서 삭제되었습니다');
     };
     
     container.appendChild(el);
   });
+}
+
+const rSearch = $('recentSearchInput');
+if (rSearch) {
+  rSearch.addEventListener('input', e => {
+    const val = e.target.value;
+    const clr = $('clearRecentSearch');
+    if (clr) clr.style.display = val ? 'inline-block' : 'none';
+    renderRecent(val);
+  });
+}
+const clrRSearch = $('clearRecentSearch');
+if (clrRSearch) {
+  clrRSearch.onclick = () => {
+    if (rSearch) rSearch.value = '';
+    clrRSearch.style.display = 'none';
+    renderRecent('');
+  };
 }
 
 $('clearRecentsBtn').onclick = async () => {
@@ -1056,6 +1595,14 @@ window.handleBackPressed = function() {
     pwdModal.classList.remove('on');
     return 'Y';
   }
+  if (tocDrawer && tocDrawer.classList.contains('open')) {
+    closeTocDrawer();
+    return 'Y';
+  }
+  if (searchBar && !searchBar.classList.contains('hide')) {
+    toggleSearchBar(false);
+    return 'Y';
+  }
   if (viewer && viewer.classList.contains('on')) {
     $('homeBtn').click();
     return 'Y';
@@ -1098,7 +1645,7 @@ if ($('appVersionBadge')) {
     if (window.AndroidBridge && window.AndroidBridge.checkUpdate) {
       window.AndroidBridge.checkUpdate();
     } else {
-      toast('최신 버전(v1.0.0)입니다');
+      toast('최신 버전(v1.1.0)입니다');
     }
   };
 }

@@ -51,8 +51,13 @@ public class GenericFileProvider extends ContentProvider {
     @Override
     public String getType(Uri uri) {
         String name = uri.getLastPathSegment();
-        if (name != null && name.endsWith(".apk")) {
-            return "application/vnd.android.package-archive";
+        if (name != null) {
+            if (name.endsWith(".apk")) {
+                return "application/vnd.android.package-archive";
+            }
+            if (name.endsWith(".pdf")) {
+                return "application/pdf";
+            }
         }
         return "application/octet-stream";
     }
