@@ -1,61 +1,25 @@
-const CACHE_NAME = 'pdf-reader-v4';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './pdf.min.js',
-  './pdf.worker.min.js',
-  './favicon.png',
-  './apple-touch-icon.png',
-  './icon-192.png',
-  './icon-maskable-192.png',
-  './icon-512.png',
-  './icon-maskable-512.png'
-];
-
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.map(k => {
-          if (k !== CACHE_NAME) return caches.delete(k);
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', e => {
-  // CDN 외부 요청 및 가상 incoming.pdf 요청은 네트워크/네이티브 직접 통과
-  const url = e.request.url;
-  if (url.includes('cdn.jsdelivr.net') || url.includes('fonts.googleapis.com') || url.includes('incoming.pdf')) {
-    return;
-  }
-
-  // Network First 전략: 최신 코드 우선 수신 후 캐시 저장, 오프라인 시 캐시 폴백
-  e.respondWith(
-    fetch(e.request)
-      .then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200 && e.request.method === 'GET') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(e.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      })
-      .catch(() => {
-        return caches.match(e.request).then(cached => {
-          return cached || caches.match('./index.html');
-        });
-      })
-  );
+const CACHE_PREFIX='djs-pdf-app:';
+const CACHE_NAME='djs-pdf-app:1.2.1-1c50695aa11e85c9';
+const ASSETS=['./','./index.html','./app.js','./reader-core.js','./reader-store.js','./manifest.json','./pdf.min.js','./pdf.worker.min.js','./favicon.png','./apple-touch-icon.png','./icon-192.png','./icon-maskable-192.png','./icon-512.png','./icon-maskable-512.png'];
+self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
+self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(CACHE_PREFIX)&&key!==CACHE_NAME).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
+self.addEventListener('fetch',event=>{
+  const url=new URL(event.request.url),base=new URL('./',self.registration.scope);
+  if(event.request.method!=='GET'||url.origin!==base.origin||!url.pathname.startsWith(base.pathname)||url.pathname.endsWith('/incoming.pdf'))return;
+  event.respondWith((async()=>{
+    const cache=await caches.open(CACHE_NAME);
+    try{
+      const response=await fetch(event.request);
+      // A PWA navigation must use the same asset generation as the offline cache.
+      // Updating the SW installs the whole new asset set before activation.
+      if(event.request.mode==='navigate')return await cache.match('./index.html')||response;
+      const cached=await cache.match(event.request,{ignoreSearch:true});
+      return cached||response;
+    }catch(_){
+      const cached=await cache.match(event.request,{ignoreSearch:true});
+      if(cached)return cached;
+      if(event.request.mode==='navigate')return await cache.match('./index.html')||Response.error();
+      return Response.error();
+    }
+  })());
 });

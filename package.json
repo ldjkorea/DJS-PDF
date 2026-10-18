@@ -1,0 +1,11 @@
+{
+  "name": "djs-pdf",
+  "private": true,
+  "version": "1.2.1",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "sync-assets": "node tools/sync-assets.cjs",
+    "check": "node --check app.js && node --check reader-core.js && node --check reader-store.js && node --check sw.js && node tools/sync-assets.cjs --check"
+  },
+  "devDependencies": { "fake-indexeddb": "6.2.5" }
+}

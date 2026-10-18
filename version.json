@@ -2,5 +2,6 @@
   "versionCode": 3,
   "versionName": "1.2.0",
   "apkUrl": "https://github.com/ldjkorea/DJS-PDF/releases/download/v1.2.0/DJS-PDF-v1.2.0.apk",
-  "releaseNotes": "DJS PDF 1.2.0 대규모 기능 업데이트\n- 연속 세로 스크롤 모드(웹툰형 무한 스크롤) 추가 및 단면 보기 원터치 전환\n- 사용자 페이지 책갈피(북마크) 등록/관리 시스템 및 IndexedDB 영속화\n- 목차 & 책갈피 통합 서랍 및 탭 전환 지원\n- 물리 볼륨키 페이지 넘김 ON/OFF 설정 토글\n- 가로 너비 맞춤 / 전체 페이지 맞춤(Fit Page) 원터치 토글"
+  "releaseNotes": "DJS PDF 1.2.0 대규모 기능 업데이트\n- 연속 세로 스크롤 모드(웹툰형 무한 스크롤) 추가 및 단면 보기 원터치 전환\n- 사용자 페이지 책갈피(북마크) 등록/관리 시스템 및 IndexedDB 영속화\n- 목차 & 책갈피 통합 서랍 및 탭 전환 지원\n- 물리 볼륨키 페이지 넘김 ON/OFF 설정 토글\n- 가로 너비 맞춤 / 전체 페이지 맞춤(Fit Page) 원터치 토글",
+  "sha256": "5ab3f3307019e10023b9bf8964bb992371aa7e6bb23fd13ad0a54f548b5025f9"
 }

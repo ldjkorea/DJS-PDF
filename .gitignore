@@ -11,3 +11,5 @@ Thumbs.db
 test_sample.pdf
 screen*.png
 cur_screen*.png
+node_modules/
+_QA/

@@ -2,27 +2,55 @@ plugins {
     id 'com.android.application'
 }
 
+// Release identity is supplied explicitly. Existing v1.2.0 installs use this
+// machine's historical debug certificate; opting into it preserves updates.
+def preserveInstalledSigner = providers.gradleProperty('preserveInstalledSigner').orNull == 'true'
+def releaseStore = System.getenv('DJS_PDF_STORE_FILE')
 android {
     namespace 'com.ldj.djspdf'
     compileSdk 35
-
     defaultConfig {
         applicationId 'com.ldj.djspdf'
         minSdk 26
         targetSdk 34
-        versionCode 3
-        versionName '1.2.0'
+        versionCode 4
+        versionName '1.2.1'
+        testInstrumentationRunner 'com.ldj.djspdf.QaInstrumentation'
     }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-
+    signingConfigs {
+        if (releaseStore) {
+            official {
+                storeFile file(releaseStore)
+                storePassword System.getenv('DJS_PDF_STORE_PASSWORD')
+                keyAlias System.getenv('DJS_PDF_KEY_ALIAS')
+                keyPassword System.getenv('DJS_PDF_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            debuggable false
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (releaseStore) signingConfig signingConfigs.official
+            else if (preserveInstalledSigner) signingConfig signingConfigs.debug
         }
+    }
+    // Build from the canonical web source, never from a stale manually copied UI.
+    sourceSets.main.assets.srcDirs = [layout.buildDirectory.dir('generated/readerAssets')]
+}
+
+tasks.register('syncWebAssets', Copy) {
+    from rootProject.projectDir.parentFile
+    include 'index.html', 'app.js', 'reader-core.js', 'reader-store.js', 'pdf.min.js', 'pdf.worker.min.js', 'manifest.json', 'sw.js', 'version.json', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-192.png', 'icon-maskable-512.png'
+    into layout.buildDirectory.dir('generated/readerAssets')
+}
+tasks.named('preBuild').configure { dependsOn 'syncWebAssets' }
+tasks.matching { it.name == 'preReleaseBuild' }.configureEach {
+    doFirst {
+        if (!releaseStore && !preserveInstalledSigner) throw new GradleException('Release signing is required. Set DJS_PDF_STORE_* / DJS_PDF_KEY_* or explicitly use -PpreserveInstalledSigner=true for the installed certificate.')
     }
 }

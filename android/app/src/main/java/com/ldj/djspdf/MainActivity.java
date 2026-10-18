@@ -8,8 +8,6 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.database.Cursor;
 import android.graphics.Color;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -36,34 +34,67 @@ import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Locale;
+import java.util.UUID;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+import java.security.MessageDigest;
+import java.io.IOException;
+import javax.net.ssl.HttpsURLConnection;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
+
 
 public class MainActivity extends Activity {
     private static final String APP_URL = "file:///android_asset/index.html";
     private static final String VERSION_URL = "https://ldjkorea.github.io/DJS-PDF/version.json";
-    private static final String INCOMING_FILE_NAME = "current_incoming.pdf";
     private static final int REQUEST_PICK_PDF = 2001;
     private static final int FILE_CHOOSER_REQUEST_CODE = 2002;
 
     private WebView webView;
     private ValueCallback<Uri[]> uploadMessage;
     private boolean pageLoaded = false;
-    private boolean incomingPdfAvailable = false;
-    private String incomingPdfName = null;
+    private static final class IncomingDocument {
+        final String id,name;
+        IncomingDocument(String id,String name){this.id=id;this.name=name;}
+    }
+    private volatile IncomingDocument incomingDocument;
+
+    private final Map<String, File> incomingFiles = new ConcurrentHashMap<>();
+    private final ExecutorService fileExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicLong incomingSequence = new AtomicLong();
+    private UpdateInfo pendingUpdate;
+    private boolean downloadRunning = false;
+    private FileOutputStream shareOutput;
+    private File shareFile;
+    private MessageDigest shareDigest;
+    private String shareExpectedHash;
+    private long shareExpectedSize, shareWritten;
+    private static final class UpdateInfo {
+        final String name, url, hash, notes; final long code;
+        UpdateInfo(String name, String url, String hash, String notes, long code) {
+            this.name=name; this.url=url; this.hash=hash; this.notes=notes; this.code=code;
+        }
+    }
     private String appVersionName = "1.0.0";
     private long appVersionCode = 1;
-    private boolean isViewerActive = false;
-    private boolean volumeKeyNavEnabled = true;
+    private volatile boolean isViewerActive = false;
+    private volatile boolean volumeKeyNavEnabled = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,9 +126,10 @@ public class MainActivity extends Activity {
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(true);
+        settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(true);
-        settings.setAllowUniversalAccessFromFileURLs(true);
+        settings.setAllowUniversalAccessFromFileURLs(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setUseWideViewPort(true);
@@ -109,7 +141,7 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onConsoleMessage(ConsoleMessage cm) {
-                Log.d("DjsPdfJS", "[" + cm.messageLevel() + "] " + cm.message() + " (" + cm.sourceId() + ":" + cm.lineNumber() + ")");
+                if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) Log.d("DjsPdfJS", cm.messageLevel().toString());
                 return true;
             }
 
@@ -144,59 +176,37 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                Uri reqUri = request.getUrl();
-                String host = reqUri.getHost();
-                String path = reqUri.getPath();
-
-                // Intercept incoming PDF request (same origin virtual stream)
-                if (path != null && path.toLowerCase().endsWith("incoming.pdf")) {
-                    File tempPdf = new File(getCacheDir(), INCOMING_FILE_NAME);
-                    if (tempPdf.exists()) {
-                        try {
-                            FileInputStream fis = new FileInputStream(tempPdf);
-                            Map<String, String> headers = new HashMap<>();
-                            headers.put("Content-Type", "application/pdf");
-                            headers.put("Cache-Control", "no-cache, no-store, must-revalidate");
-                            headers.put("Access-Control-Allow-Origin", "*");
-                            return new WebResourceResponse("application/pdf", "binary", 200, "OK", headers, fis);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
+                Uri uri = request.getUrl();
+                if ("file".equals(uri.getScheme()) && "/android_asset/incoming.pdf".equals(uri.getPath())) {
+                    String id=uri.getQueryParameter("id"); File file=id==null?null:incomingFiles.get(id);
+                    if (file != null) try {
+                        Map<String,String> headers=new HashMap<>();
+                        headers.put("Content-Length",String.valueOf(file.length()));headers.put("Cache-Control","no-store");
+                        return new WebResourceResponse("application/pdf",null,200,"OK",headers,new FileInputStream(file));
+                    } catch (IOException ignored) { }
+                    return blockedResource();
                 }
-
-                // Offline fallback: serve bundled assets if device has no internet
-                if (!isNetworkConnected() && host != null && host.contains("github.io")) {
-                    String assetName = getAssetFileName(path);
-                    if (assetName != null) {
-                        try {
-                            InputStream is = getAssets().open(assetName);
-                            String mime = getMimeType(assetName);
-                            Map<String, String> headers = new HashMap<>();
-                            headers.put("Access-Control-Allow-Origin", "*");
-                            return new WebResourceResponse(mime, "UTF-8", 200, "OK", headers, is);
-                        } catch (Exception ignored) {}
-                    }
+                if ("file".equals(uri.getScheme()) && uri.getQuery()==null && uri.getPath()!=null && uri.getPath().startsWith("/android_asset/")) {
+                    String asset=uri.getPath().substring("/android_asset/".length());
+                    if (getAssetFileName(asset)!=null) return super.shouldInterceptRequest(view,request);
                 }
-
-                return super.shouldInterceptRequest(view, request);
+                // Remote or arbitrary private files never inherit this WebView's bridge.
+                return blockedResource();
             }
 
             @Override
-            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                super.onReceivedError(view, errorCode, description, failingUrl);
-                if (failingUrl != null && failingUrl.startsWith("http")) {
-                    view.loadUrl("file:///android_asset/index.html");
-                }
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return !APP_URL.equals(request.getUrl().toString());
             }
+
+
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 pageLoaded = true;
-                if (incomingPdfAvailable && incomingPdfName != null) {
-                    notifyPdfToWeb(incomingPdfName);
-                }
+                IncomingDocument incoming=incomingDocument;
+                if(incoming!=null&&incomingFiles.containsKey(incoming.id))notifyPdfToWeb(incoming.name,incoming.id);
             }
         });
 
@@ -226,9 +236,16 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (isViewerActive) {
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (isViewerActive) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (pendingUpdate != null && getPackageManager().canRequestPackageInstalls()) {
+            UpdateInfo update=pendingUpdate; pendingUpdate=null; startApkDownload(update);
         }
+    }
+
+    @Override protected void onDestroy() {
+        incomingSequence.incrementAndGet(); fileExecutor.shutdownNow();
+        if (webView != null) { webView.removeJavascriptInterface("AndroidBridge"); webView.destroy(); webView=null; }
+        super.onDestroy();
     }
 
     private void handleIntent(Intent intent) {
@@ -247,71 +264,50 @@ public class MainActivity extends Activity {
     }
 
     private void processIncomingUri(Uri uri) {
-        new Thread(() -> {
+        final long sequence=incomingSequence.incrementAndGet();
+        fileExecutor.execute(() -> {
+            File copy=null;
             try {
-                String fileName = resolveFileName(uri);
-                File tempPdf = new File(getCacheDir(), INCOMING_FILE_NAME);
-
-                InputStream in = null;
-                if ("file".equalsIgnoreCase(uri.getScheme())) {
-                    in = new FileInputStream(new File(uri.getPath()));
-                } else {
-                    in = getContentResolver().openInputStream(uri);
-                }
-
-                if (in == null) {
-                    Log.e("DjsPdf", "InputStream is null for " + uri);
-                    return;
-                }
-
-                try (InputStream is = in;
-                     OutputStream out = new FileOutputStream(tempPdf)) {
-                    byte[] buffer = new byte[16384];
-                    int bytesRead;
-                    while ((bytesRead = is.read(buffer)) != -1) {
-                        out.write(buffer, 0, bytesRead);
+                String scheme=uri.getScheme();
+                if (!"content".equals(scheme) && !"file".equals(scheme)) throw new IOException("지원하지 않는 문서 주소");
+                String id=UUID.randomUUID().toString();
+                File dir=new File(getCacheDir(),"incoming"); if(!dir.exists()&&!dir.mkdirs())throw new IOException("임시 공간 없음");
+                copy=new File(dir,id+".pdf");
+                try (InputStream input="file".equals(scheme)?openExternalFile(uri):getContentResolver().openInputStream(uri);
+                     OutputStream output=new FileOutputStream(copy)) {
+                    if(input==null)throw new IOException("문서를 읽을 수 없습니다");
+                    byte[] buffer=new byte[16384];int count;long total=0;
+                    while((count=input.read(buffer))!=-1){
+                        total+=count;if(total>FileSafety.MAX_BYTES)throw new IOException("256MB 이하 PDF를 열어 주세요");
+                        output.write(buffer,0,count);
                     }
-                    out.flush();
                 }
-
-                incomingPdfAvailable = true;
-                incomingPdfName = fileName;
-                Log.i("DjsPdf", "Successfully copied PDF (" + tempPdf.length() + " bytes) as " + fileName);
-
-                if (pageLoaded) {
-                    runOnUiThread(() -> notifyPdfToWeb(fileName));
-                }
-            } catch (Exception e) {
-                Log.e("DjsPdf", "processIncomingUri failed", e);
-                runOnUiThread(() -> Toast.makeText(this, "PDF 파일 읽기 실패: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-            }
-        }).start();
-    }
-
-    private void notifyPdfToWeb(String fileName) {
-        String quotedName = JSONObject.quote(fileName);
-        Log.i("DjsPdf", "notifyPdfToWeb invoking openIncomingFromNative for: " + quotedName);
-        String js = "(function() {" +
-                "  var name = " + quotedName + ";" +
-                "  if (window.openIncomingFromNative) {" +
-                "    window.openIncomingFromNative(name);" +
-                "  } else {" +
-                "    var tries = 30;" +
-                "    var iv = setInterval(function() {" +
-                "      if (window.openIncomingFromNative) {" +
-                "        clearInterval(iv);" +
-                "        window.openIncomingFromNative(name);" +
-                "      } else if (--tries <= 0) {" +
-                "        clearInterval(iv);" +
-                "        console.error('Timed out waiting for openIncomingFromNative');" +
-                "      }" +
-                "    }, 100);" +
-                "  }" +
-                "})();";
-        webView.evaluateJavascript(js, value -> {
-            Log.i("DjsPdf", "evaluateJavascript callback: " + value);
+                if(sequence!=incomingSequence.get()){copy.delete();return;}
+                final String name=FileSafety.pdfName(resolveFileName(uri));
+                incomingFiles.put(id,copy);incomingDocument=new IncomingDocument(id,name);
+                if(pageLoaded)runOnUiThread(()->notifyPdfToWeb(name,id));
+            }catch(Exception e){if(copy!=null)copy.delete();runOnUiThread(()->Toast.makeText(this,"PDF 파일 읽기 실패: "+e.getMessage(),Toast.LENGTH_LONG).show());}
         });
     }
+
+    private InputStream openExternalFile(Uri uri) throws IOException {
+        File file=new File(uri.getPath()).getCanonicalFile();
+        String privateRoot=new File(getApplicationInfo().dataDir).getCanonicalPath()+File.separator;
+        if(file.getPath().startsWith(privateRoot))throw new IOException("앱 내부 파일은 열 수 없습니다");
+        return new FileInputStream(file);
+    }
+
+    private void notifyPdfToWeb(String fileName,String id) {
+        if(webView==null||id==null)return;
+        webView.evaluateJavascript("window.openIncomingFromNative && window.openIncomingFromNative("
+                +JSONObject.quote(fileName)+","+JSONObject.quote(id)+");",null);
+    }
+
+    private WebResourceResponse blockedResource() {
+        return new WebResourceResponse("text/plain","UTF-8",403,"Forbidden",new HashMap<>(),new java.io.ByteArrayInputStream(new byte[0]));
+    }
+
+
 
     private String resolveFileName(Uri uri) {
         String result = null;
@@ -331,44 +327,17 @@ public class MainActivity extends Activity {
         if (result == null || result.trim().isEmpty()) {
             result = "외부문서.pdf";
         }
-        if (!result.toLowerCase().endsWith(".pdf")) {
+        if (!result.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
             result = result + ".pdf";
         }
         return result;
     }
 
-    private boolean isNetworkConnected() {
-        try {
-            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-            NetworkInfo netInfo = cm != null ? cm.getActiveNetworkInfo() : null;
-            return netInfo != null && netInfo.isConnected();
-        } catch (Exception e) {
-            return true;
-        }
-    }
-
     private String getAssetFileName(String path) {
-        if (path == null || path.equals("/") || path.endsWith("/djs-pdf/")) return "index.html";
-        if (path.endsWith("pdf.min.js")) return "pdf.min.js";
-        if (path.endsWith("pdf.worker.min.js")) return "pdf.worker.min.js";
-        if (path.endsWith("manifest.json")) return "manifest.json";
-        if (path.endsWith("sw.js")) return "sw.js";
-        if (path.endsWith("favicon.png")) return "favicon.png";
-        if (path.endsWith("apple-touch-icon.png")) return "apple-touch-icon.png";
-        if (path.endsWith("icon-192.png")) return "icon-192.png";
-        if (path.endsWith("icon-512.png")) return "icon-512.png";
-        if (path.endsWith("icon-maskable-192.png")) return "icon-maskable-192.png";
-        if (path.endsWith("icon-maskable-512.png")) return "icon-maskable-512.png";
-        return null;
+        return Arrays.asList("index.html","app.js","reader-core.js","reader-store.js","pdf.min.js","pdf.worker.min.js","manifest.json","sw.js","version.json","favicon.png","apple-touch-icon.png","icon-192.png","icon-512.png","icon-maskable-192.png","icon-maskable-512.png").contains(path)?path:null;
     }
 
-    private String getMimeType(String assetName) {
-        if (assetName.endsWith(".html")) return "text/html";
-        if (assetName.endsWith(".js")) return "application/javascript";
-        if (assetName.endsWith(".json")) return "application/json";
-        if (assetName.endsWith(".png")) return "image/png";
-        return "application/octet-stream";
-    }
+
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -466,41 +435,24 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean hasIncomingPdf() {
-            return incomingPdfAvailable;
+            IncomingDocument incoming=incomingDocument;return incoming!=null&&incomingFiles.containsKey(incoming.id);
         }
 
         @JavascriptInterface
         public String getIncomingPdfName() {
-            return incomingPdfName != null ? incomingPdfName : "문서.pdf";
+            IncomingDocument incoming=incomingDocument;return incoming!=null?incoming.name:"문서.pdf";
         }
 
-        @JavascriptInterface
-        public void onPdfLoaded() {
-            incomingPdfAvailable = false;
+        @JavascriptInterface public String getIncomingPdfId() { IncomingDocument incoming=incomingDocument;return incoming!=null?incoming.id:""; }
+        @JavascriptInterface public String getIncomingPdfInfo() {
+            IncomingDocument incoming=incomingDocument;
+            if(incoming==null||!incomingFiles.containsKey(incoming.id))return "null";
+            return "{\"id\":"+JSONObject.quote(incoming.id)+",\"name\":"+JSONObject.quote(incoming.name)+"}";
         }
-
-        @JavascriptInterface
-        public String getAppVersion() {
-            return appVersionName;
+        @JavascriptInterface public void onPdfLoaded(String id) {
+            File file=incomingFiles.remove(id);if(file!=null)file.delete();
         }
-
-        @JavascriptInterface
-        public String getIncomingPdfBase64() {
-            File tempPdf = new File(getCacheDir(), INCOMING_FILE_NAME);
-            if (!tempPdf.exists()) return "";
-            try (FileInputStream fis = new FileInputStream(tempPdf);
-                 ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-                byte[] buf = new byte[16384];
-                int len;
-                while ((len = fis.read(buf)) != -1) {
-                    bos.write(buf, 0, len);
-                }
-                return Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP);
-            } catch (Exception e) {
-                Log.e("DjsPdf", "getIncomingPdfBase64 failed", e);
-                return "";
-            }
-        }
+        @JavascriptInterface public String getAppVersion() { return appVersionName; }
 
         @JavascriptInterface
         public void checkUpdate() {
@@ -528,189 +480,142 @@ public class MainActivity extends Activity {
             volumeKeyNavEnabled = enabled;
         }
 
-        @JavascriptInterface
-        public void saveCurrentPdfBase64(String base64Data, String fileName) {
+        @JavascriptInterface public synchronized boolean beginShare(String hash,String name,long size) {
+            cancelShare();
             try {
-                byte[] bytes = Base64.decode(base64Data, Base64.NO_WRAP);
-                File tempPdf = new File(getCacheDir(), INCOMING_FILE_NAME);
-                try (FileOutputStream fos = new FileOutputStream(tempPdf)) {
-                    fos.write(bytes);
-                }
-                incomingPdfName = fileName;
-                Log.i("DjsPdf", "Synced current PDF to cache (" + tempPdf.length() + " bytes): " + fileName);
-            } catch (Exception e) {
-                Log.e("DjsPdf", "saveCurrentPdfBase64 failed", e);
-            }
+                if(hash==null||!hash.matches("[0-9a-f]{64}")||size<=0||size>FileSafety.MAX_BYTES)return false;
+                File dir=new File(getCacheDir(),"shared/"+UUID.randomUUID());
+                if(!dir.mkdirs())return false;
+                shareFile=FileSafety.within(dir,new File(dir,FileSafety.pdfName(name)));
+                shareOutput=new FileOutputStream(shareFile);shareDigest=MessageDigest.getInstance("SHA-256");
+                shareExpectedHash=hash;shareExpectedSize=size;shareWritten=0;return true;
+            }catch(Exception e){cancelShare();return false;}
         }
-
-        @JavascriptInterface
-        public boolean isCurrentPdfReady(String fileName) {
-            File tempPdf = new File(getCacheDir(), INCOMING_FILE_NAME);
-            return tempPdf.exists() && tempPdf.length() > 0 &&
-                    (fileName == null || fileName.equals(incomingPdfName));
+        @JavascriptInterface public synchronized boolean appendShareChunk(String chunk) {
+            try {
+                if(shareOutput==null||chunk==null||chunk.length()>65536)throw new IOException("잘못된 공유 데이터");
+                byte[] bytes=Base64.decode(chunk,Base64.NO_WRAP);shareWritten+=bytes.length;
+                if(shareWritten>shareExpectedSize)throw new IOException("파일 크기 불일치");
+                shareOutput.write(bytes);shareDigest.update(bytes);return true;
+            }catch(Exception e){cancelShare();return false;}
         }
-
-        @JavascriptInterface
-        public void shareCurrentPdf(String displayName) {
-            runOnUiThread(() -> {
-                File tempPdf = new File(getCacheDir(), INCOMING_FILE_NAME);
-                if (!tempPdf.exists() || tempPdf.length() == 0) {
-                    Toast.makeText(MainActivity.this, "공유할 PDF 문서가 준비되지 않았습니다.", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                try {
-                    String cleanName = (displayName != null && !displayName.trim().isEmpty())
-                            ? displayName.trim() : (incomingPdfName != null ? incomingPdfName : "문서.pdf");
-                    if (!cleanName.toLowerCase().endsWith(".pdf")) cleanName += ".pdf";
-
-                    File shareFile = new File(getCacheDir(), cleanName);
-                    try (InputStream in = new FileInputStream(tempPdf);
-                         OutputStream out = new FileOutputStream(shareFile)) {
-                        byte[] buf = new byte[16384];
-                        int len;
-                        while ((len = in.read(buf)) != -1) {
-                            out.write(buf, 0, len);
-                        }
-                        out.flush();
-                    }
-
-                    Uri contentUri = GenericFileProvider.getUriForFile(MainActivity.this, shareFile);
-                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                    shareIntent.setType("application/pdf");
-                    shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
-                    shareIntent.putExtra(Intent.EXTRA_SUBJECT, cleanName);
-                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    startActivity(Intent.createChooser(shareIntent, "PDF 문서 공유"));
-                } catch (Exception e) {
-                    Log.e("DjsPdf", "shareCurrentPdf failed", e);
-                    Toast.makeText(MainActivity.this, "문서 공유 실패: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
+        @JavascriptInterface public synchronized boolean finishShare() {
+            try {
+                if(shareOutput==null) return false;
+                shareOutput.close();shareOutput=null;
+                if(shareWritten!=shareExpectedSize||!hex(shareDigest.digest()).equals(shareExpectedHash))throw new IOException("파일 해시 불일치");
+                final File ready=shareFile;shareFile=null;shareDigest=null;
+                runOnUiThread(()->{
+                    try {
+                        Uri uri=GenericFileProvider.getUriForFile(MainActivity.this,ready);
+                        Intent intent=new Intent(Intent.ACTION_SEND).setType("application/pdf");
+                        intent.putExtra(Intent.EXTRA_STREAM,uri);intent.putExtra(Intent.EXTRA_SUBJECT,ready.getName());
+                        intent.setClipData(android.content.ClipData.newRawUri("PDF",uri));intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(intent,"PDF 문서 공유"));
+                    }catch(Exception e){Toast.makeText(MainActivity.this,"문서 공유 실패",Toast.LENGTH_LONG).show();}
+                });return true;
+            }catch(Exception e){cancelShare();return false;}
+        }
+        @JavascriptInterface public synchronized void cancelShare() {
+            try{if(shareOutput!=null)shareOutput.close();}catch(IOException ignored){}
+            if(shareFile!=null)shareFile.delete();shareOutput=null;shareFile=null;shareDigest=null;
         }
     }
 
-    /* ── 자동 업데이트 기능 ── */
+    private static String hex(byte[] data) {
+        StringBuilder text=new StringBuilder();for(byte b:data)text.append(String.format(Locale.ROOT,"%02x",b&255));return text.toString();
+    }
+
+    /* Updates require an approved repository URL, digest, package, version and installed signer. */
     private void checkAutoUpdate(boolean userInitiated) {
-        new Thread(() -> {
+        new Thread(()->{
+            HttpsURLConnection connection=null;
             try {
-                URL url = new URL(VERSION_URL + "?t=" + System.currentTimeMillis());
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(6000);
-                conn.setReadTimeout(6000);
-                conn.setRequestMethod("GET");
-                int respCode = conn.getResponseCode();
-
-                if (respCode == 200) {
-                    BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = br.readLine()) != null) sb.append(line);
-                    br.close();
-
-                    JSONObject json = new JSONObject(sb.toString());
-                    int remoteVersionCode = json.optInt("versionCode", 1);
-                    String remoteVersionName = json.optString("versionName", "1.0.0");
-                    String apkUrl = json.optString("apkUrl", "");
-                    String releaseNotes = json.optString("releaseNotes", "");
-
-                    if (remoteVersionCode > appVersionCode) {
-                        runOnUiThread(() -> showUpdateDialog(remoteVersionName, apkUrl, releaseNotes));
-                    } else if (userInitiated) {
-                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "현재 최신 버전(v" + appVersionName + ")입니다.", Toast.LENGTH_SHORT).show());
-                    }
-                } else if (userInitiated) {
-                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "업데이트 정보를 확인할 수 없습니다. (HTTP " + respCode + ")", Toast.LENGTH_SHORT).show());
+                connection=openHttps(VERSION_URL+"?t="+System.currentTimeMillis(),false);
+                StringBuilder jsonText=new StringBuilder();
+                try(BufferedReader reader=new BufferedReader(new InputStreamReader(connection.getInputStream(),java.nio.charset.StandardCharsets.UTF_8))){
+                    String line;while((line=reader.readLine())!=null){jsonText.append(line);if(jsonText.length()>65536)throw new IOException("업데이트 정보 크기 초과");}
                 }
-            } catch (Exception e) {
-                if (userInitiated) {
-                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "업데이트 확인 실패: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-                }
-            }
-        }).start();
+                JSONObject json=new JSONObject(jsonText.toString());long code=json.optLong("versionCode",0);
+                if(code<=appVersionCode){if(userInitiated)notice("현재 최신 공개 버전입니다. (앱 v"+appVersionName+")");return;}
+                String url=json.optString("apkUrl"),hash=json.optString("sha256").toLowerCase(Locale.ROOT);
+                if(!FileSafety.apkUrl(url)||!hash.matches("[0-9a-f]{64}"))throw new IOException("업데이트 무결성 정보가 올바르지 않습니다");
+                UpdateInfo update=new UpdateInfo(json.getString("versionName"),url,hash,json.optString("releaseNotes"),code);
+                runOnUiThread(()->showUpdateDialog(update));
+            }catch(Exception e){if(userInitiated)notice("업데이트 확인 실패: "+e.getMessage());}
+            finally{if(connection!=null)connection.disconnect();}
+        },"pdf-update-check").start();
     }
-
-    private void showUpdateDialog(String newVersion, String apkUrl, String notes) {
-        if (isFinishing()) return;
-        new AlertDialog.Builder(this)
-                .setTitle("DJS PDF 최신 업데이트 (v" + newVersion + ")")
-                .setMessage((notes.isEmpty() ? "새로운 기능과 성능 개선이 포함된 업데이트가 있습니다." : notes) + "\n\n지금 설치하시겠습니까?")
-                .setPositiveButton("지금 업데이트", (dialog, which) -> startApkDownload(apkUrl))
-                .setNegativeButton("나중에", null)
-                .show();
+    private void notice(String message) {
+        runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())Toast.makeText(this,message,Toast.LENGTH_LONG).show();});
     }
-
-    private void startApkDownload(String apkUrl) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!getPackageManager().canRequestPackageInstalls()) {
-                new AlertDialog.Builder(this)
-                        .setTitle("설치 권한 필요")
-                        .setMessage("앱 업데이트를 설치하려면 '이 출처의 앱 허용' 권한이 필요합니다. 설정 화면으로 이동하시겠습니까?")
-                        .setPositiveButton("설정으로 이동", (d, w) -> {
-                            Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()));
-                            startActivity(intent);
-                        })
-                        .setNegativeButton("취소", null)
-                        .show();
-                return;
-            }
+    private HttpsURLConnection openHttps(String address,boolean asset) throws IOException {
+        URL url=new URL(address);
+        for(int redirects=0;redirects<6;redirects++){
+            String host=url.getHost();
+            boolean allowed=asset?Arrays.asList("github.com","release-assets.githubusercontent.com","objects.githubusercontent.com").contains(host):"ldjkorea.github.io".equals(host);
+            if(!"https".equals(url.getProtocol())||!allowed||url.getUserInfo()!=null||(url.getPort()!=-1&&url.getPort()!=443))throw new IOException("허용되지 않은 다운로드 주소");
+            HttpsURLConnection conn=(HttpsURLConnection)url.openConnection();conn.setConnectTimeout(10000);conn.setReadTimeout(15000);conn.setInstanceFollowRedirects(false);
+            int status=conn.getResponseCode();
+            if(status>=300&&status<400){String location=conn.getHeaderField("Location");conn.disconnect();if(location==null)throw new IOException("잘못된 리디렉션");url=new URL(url,location);continue;}
+            if(status!=200){conn.disconnect();throw new IOException("HTTP "+status);}return conn;
         }
-
-        ProgressDialog progressDialog = new ProgressDialog(this);
-        progressDialog.setTitle("DJS PDF 업데이트 다운로드");
-        progressDialog.setMessage("최신 설치 파일을 다운로드하고 있습니다…");
-        progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        progressDialog.setMax(100);
-        progressDialog.setCancelable(false);
-        progressDialog.show();
-
-        new Thread(() -> {
-            File apkFile = new File(getCacheDir(), "djs-pdf-update.apk");
+        throw new IOException("리디렉션 횟수 초과");
+    }
+    private void showUpdateDialog(UpdateInfo update) {
+        if(isFinishing()||isDestroyed())return;
+        new AlertDialog.Builder(this).setTitle("DJS PDF 업데이트 (v"+update.name+")")
+            .setMessage(update.notes+"\n\n지금 설치하시겠습니까?")
+            .setPositiveButton("지금 업데이트",(dialog,which)->startApkDownload(update)).setNegativeButton("나중에",null).show();
+    }
+    private void startApkDownload(UpdateInfo update) {
+        if(downloadRunning||isFinishing()||isDestroyed())return;
+        if(!getPackageManager().canRequestPackageInstalls()){
+            new AlertDialog.Builder(this).setTitle("설치 권한 필요").setMessage("앱 업데이트를 설치하려면 이 출처의 앱 설치를 허용해 주세요.")
+                .setPositiveButton("설정으로 이동",(dialog,which)->{
+                    pendingUpdate=update;startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+getPackageName())));
+                }).setNegativeButton("취소",null).show();return;
+        }
+        downloadRunning=true;
+        ProgressDialog progress=new ProgressDialog(this);progress.setTitle("DJS PDF 업데이트");progress.setMessage("설치 파일 다운로드 및 무결성 확인 중…");progress.setIndeterminate(true);progress.setCancelable(false);progress.show();
+        new Thread(()->{
+            File apk=null;HttpsURLConnection conn=null;
             try {
-                URL url = new URL(apkUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(15000);
-                conn.connect();
-                int fileLength = conn.getContentLength();
-
-                try (InputStream input = new BufferedInputStream(conn.getInputStream());
-                     OutputStream output = new FileOutputStream(apkFile)) {
-                    byte[] data = new byte[8192];
-                    long total = 0;
-                    int count;
-                    while ((count = input.read(data)) != -1) {
-                        total += count;
-                        if (fileLength > 0) {
-                            int progress = (int) (total * 100 / fileLength);
-                            runOnUiThread(() -> progressDialog.setProgress(progress));
-                        }
-                        output.write(data, 0, count);
-                    }
-                    output.flush();
+                if(!FileSafety.apkUrl(update.url))throw new IOException("허용되지 않은 업데이트 주소");
+                File dir=new File(getCacheDir(),"shared/"+UUID.randomUUID());if(!dir.mkdirs())throw new IOException("저장 공간 없음");
+                apk=new File(dir,"djs-pdf-update.apk");conn=openHttps(update.url,true);long length=conn.getContentLengthLong();
+                if(length>FileSafety.MAX_BYTES)throw new IOException("설치 파일 크기 초과");
+                MessageDigest digest=MessageDigest.getInstance("SHA-256");long total=0;
+                try(InputStream in=conn.getInputStream();OutputStream out=new FileOutputStream(apk)){
+                    byte[] bytes=new byte[16384];int count;
+                    while((count=in.read(bytes))!=-1){total+=count;if(total>FileSafety.MAX_BYTES)throw new IOException("설치 파일 크기 초과");digest.update(bytes,0,count);out.write(bytes,0,count);}
                 }
-
-                runOnUiThread(() -> {
-                    progressDialog.dismiss();
-                    installApk(apkFile);
-                });
-            } catch (Exception e) {
-                runOnUiThread(() -> {
-                    progressDialog.dismiss();
-                    Toast.makeText(MainActivity.this, "다운로드 실패: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                });
-            }
-        }).start();
+                if(total==0||(length>=0&&length!=total)||!hex(digest.digest()).equals(update.hash))throw new IOException("설치 파일 해시 또는 크기 불일치");
+                verifyApk(apk,update.code);final File ready=apk;
+                runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){progress.dismiss();installApk(ready);}downloadRunning=false;});
+            }catch(Exception e){if(apk!=null)apk.delete();runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){progress.dismiss();Toast.makeText(this,"업데이트 중단: "+e.getMessage(),Toast.LENGTH_LONG).show();}downloadRunning=false;});}
+            finally{if(conn!=null)conn.disconnect();}
+        },"pdf-update-download").start();
     }
-
-    private void installApk(File apkFile) {
-        try {
-            Uri apkUri = GenericFileProvider.getUriForFile(this, apkFile);
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-        } catch (Exception e) {
-            Toast.makeText(this, "설치 실행 실패: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+    private Set<String> signers(PackageInfo info) throws Exception {
+        Signature[] signatures=Build.VERSION.SDK_INT>=28&&info.signingInfo!=null?info.signingInfo.getApkContentsSigners():info.signatures;
+        if(signatures==null||signatures.length==0)throw new IOException("APK 서명 없음");
+        Set<String> result=new HashSet<>();for(Signature sig:signatures)result.add(hex(MessageDigest.getInstance("SHA-256").digest(sig.toByteArray())));return result;
+    }
+    private void verifyApk(File file,long expectedCode) throws Exception {
+        int flags=Build.VERSION.SDK_INT>=28?PackageManager.GET_SIGNING_CERTIFICATES:PackageManager.GET_SIGNATURES;
+        PackageInfo archive=getPackageManager().getPackageArchiveInfo(file.getPath(),flags);
+        if(archive==null||!getPackageName().equals(archive.packageName))throw new IOException("업데이트 패키지 불일치");
+        long code=Build.VERSION.SDK_INT>=28?archive.getLongVersionCode():archive.versionCode;
+        if(code!=expectedCode||code<=appVersionCode)throw new IOException("업데이트 버전 불일치");
+        if(archive.applicationInfo==null||(archive.applicationInfo.flags&ApplicationInfo.FLAG_DEBUGGABLE)!=0)throw new IOException("디버그 앱은 업데이트로 설치할 수 없습니다");
+        if(!signers(archive).equals(signers(getPackageManager().getPackageInfo(getPackageName(),flags))))throw new IOException("기존 앱과 APK 서명이 다릅니다");
+    }
+    private void installApk(File apk) {
+        try{
+            Uri uri=GenericFileProvider.getUriForFile(this,apk);
+            Intent intent=new Intent(Intent.ACTION_VIEW).setDataAndType(uri,"application/vnd.android.package-archive");
+            intent.setClipData(android.content.ClipData.newRawUri("APK",uri));intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(intent);
+        }catch(Exception e){notice("설치 화면을 열지 못했습니다");}
     }
 }
